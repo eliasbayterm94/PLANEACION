@@ -1,12 +1,16 @@
 import { regions } from './data/regions.js';
 import { markets } from './data/markets.js';
+import { defaultWarehouses, emptyWarehouseConfig } from './data/warehouses.js';
 import { buildSchedules, CAMPAIGNS, YEAR } from './model.js';
-import { loadPlan, savePlanSlug, subscribeToPlan, isRemote, editor, setEditor } from './store.js';
+import {
+  loadPlan, savePlanSlug, saveWarehouse, subscribeToPlan, isRemote, editor, setEditor,
+} from './store.js';
 import { renderMarket } from './views/market.js';
 import { renderConsolidado } from './views/consolidado.js';
 import { renderProducts } from './views/products.js';
 import { renderCosechas } from './views/cosechas.js';
 import { renderRegionesEditor } from './views/regionesEditor.js';
+import { renderBodegas } from './views/bodegas.js';
 
 const schedules = buildSchedules(regions);
 
@@ -15,8 +19,18 @@ const state = {
   editRegion: schedules[0]?.slug ?? null, // selected origin in the edit tab
   regionQty: {},
   marketQty: {},
+  warehouses: {}, // { marketSlug: { primary, warehouses: [{name, lead}] } }
   status: '',
 };
+
+/** Effective warehouse config per market: stored override, else seed default. */
+function buildWarehouses(stored = {}) {
+  const out = {};
+  markets.forEach((m) => {
+    out[m.slug] = stored[m.slug] || defaultWarehouses[m.slug] || emptyWarehouseConfig();
+  });
+  return out;
+}
 
 // A Lucide icon name per navigation group (brand rule 1: no emojis).
 const GROUP_ICON = {
@@ -31,6 +45,7 @@ const TABS = [
   { id: 'cosechas', label: 'Cosechas', group: 'Origen', icon: 'eye' },
   { id: 'regiones', label: 'Editar regiones', group: 'Origen', icon: 'square-pen' },
   ...markets.map((m) => ({ id: `market:${m.slug}`, label: m.name, group: 'Destino' })),
+  { id: 'bodegas', label: 'Bodegas', group: 'Destino', icon: 'warehouse' },
   { id: 'products:1', label: CAMPAIGNS[1].name, group: 'Productos' },
   { id: 'products:2', label: CAMPAIGNS[2].name, group: 'Productos' },
 ];
@@ -116,6 +131,7 @@ function renderView() {
       schedules, markets,
       regionQty: state.regionQty,
       marketQty: state.marketQty,
+      warehouses: state.warehouses,
     }));
   } else if (kind === 'cosechas') {
     root.appendChild(renderCosechas({
@@ -136,6 +152,17 @@ function renderView() {
       market,
       qty: state.marketQty[arg] || {},
       onQty: (month, value) => updateQty('market', arg, month, value),
+      warehouses: state.warehouses[arg],
+    }));
+  } else if (kind === 'bodegas') {
+    root.appendChild(renderBodegas({
+      markets,
+      warehouses: state.warehouses,
+      onChange: (slug, config) => {
+        state.warehouses[slug] = config;
+        saveWarehouse(slug, config, setStatus);
+        render();
+      },
     }));
   } else if (kind === 'products') {
     root.appendChild(renderProducts({ campaign: Number(arg) }));
@@ -181,16 +208,18 @@ async function init() {
   const fromHash = location.hash.slice(1);
   if (fromHash && TABS.some((t) => t.id === fromHash)) state.view = fromHash;
 
-  const { region, market, error } = await loadPlan();
+  const { region, market, warehouse, error } = await loadPlan();
   state.regionQty = region;
   state.marketQty = market;
+  state.warehouses = buildWarehouses(warehouse);
   if (error) setStatus('error', error);
 
   render();
 
-  subscribeToPlan((scope, slug, months) => {
-    const bucket = scope === 'region' ? state.regionQty : state.marketQty;
-    bucket[slug] = months;
+  subscribeToPlan((scope, slug, value) => {
+    if (scope === 'warehouse') state.warehouses[slug] = value;
+    else if (scope === 'region') state.regionQty[slug] = value;
+    else state.marketQty[slug] = value;
     render();
   });
 }

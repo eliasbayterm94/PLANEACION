@@ -4,7 +4,7 @@
 
 create table if not exists plan_allocations (
   year        int         not null,
-  scope       text        not null check (scope in ('region', 'market')),
+  scope       text        not null check (scope in ('region', 'market', 'warehouse')),
   slug        text        not null,
   months      jsonb       not null default '{}'::jsonb,
   updated_at  timestamptz not null default now(),
@@ -12,8 +12,14 @@ create table if not exists plan_allocations (
   primary key (year, scope, slug)
 );
 
+-- Migration for deployments created before the 'warehouse' scope existed.
+-- Safe to run repeatedly; brings the CHECK constraint up to date.
+alter table plan_allocations drop constraint if exists plan_allocations_scope_check;
+alter table plan_allocations add constraint plan_allocations_scope_check
+  check (scope in ('region', 'market', 'warehouse'));
+
 comment on column plan_allocations.months is
-  'Month index (0=Ene) -> container count. Origin rows are keyed by shipping month, destination rows by cutoff month.';
+  'For region/market rows: month index (0=Ene) -> container count (origin keyed by shipping month, destination by cutoff). For warehouse rows: a config object { primary, warehouses:[{name, lead}] }, not a month map.';
 
 -- Change log, so a planning session is auditable after the fact.
 create table if not exists plan_changes (

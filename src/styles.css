@@ -403,6 +403,145 @@
 }
 .card-list li:last-child { border-bottom: none; }
 
+/* --- Warehouses: market panel ------------------------------------------- */
+.wh-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--fc-space-6);
+}
+.wh-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--fc-ink-100);
+  border-radius: var(--fc-radius-pill);
+  padding: 6px 14px;
+}
+.wh-chip--primary { border-color: var(--fc-navy); background: var(--fc-cream); }
+.wh-chip-name {
+  font-family: var(--fc-font-body);
+  font-size: var(--fc-fs-12);
+  font-weight: var(--fc-fw-semibold);
+  color: var(--fc-navy);
+}
+.wh-chip-lead {
+  font-family: var(--fc-font-mono);
+  font-size: var(--fc-fs-11);
+  color: var(--fc-ink-500);
+}
+.wh-chip-tag {
+  font-family: var(--fc-font-display);
+  font-size: 8px;
+  font-weight: var(--fc-fw-bold);
+  letter-spacing: var(--fc-ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--fc-navy);
+  background: var(--fc-yellow);
+  padding: 2px 7px;
+  border-radius: var(--fc-radius-1);
+}
+
+/* --- Warehouses: editor (Bodegas tab) ----------------------------------- */
+.wh-card {
+  background: #fff;
+  border: 1px solid var(--fc-ink-100);
+  border-radius: var(--fc-radius-4);
+  padding: 18px 20px;
+  margin-bottom: var(--fc-space-4);
+  box-shadow: var(--fc-shadow-1);
+}
+.wh-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.wh-card-title {
+  font-family: var(--fc-font-display);
+  font-size: var(--fc-fs-16);
+  font-weight: var(--fc-fw-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--fc-ls-loose);
+  color: var(--fc-navy);
+}
+.wh-card-sub { font-family: var(--fc-font-body); font-size: var(--fc-fs-11); color: var(--fc-ink-500); }
+
+.wh-list { display: flex; flex-direction: column; gap: 6px; }
+.wh-row {
+  display: grid;
+  grid-template-columns: 44px 1fr 130px 40px;
+  align-items: center;
+  gap: 10px;
+}
+.wh-row--head span {
+  font-family: var(--fc-font-display);
+  font-size: 9px;
+  font-weight: var(--fc-fw-bold);
+  letter-spacing: var(--fc-ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--fc-ink-500);
+}
+.wh-col-primary { text-align: center; }
+.wh-primary { width: 16px; height: 16px; justify-self: center; accent-color: var(--fc-navy); cursor: pointer; }
+.wh-input {
+  font-family: var(--fc-font-body);
+  font-size: var(--fc-fs-14);
+  color: var(--fc-navy);
+  background: #fff;
+  border: 1px solid var(--fc-ink-100);
+  border-radius: var(--fc-radius-2);
+  padding: 8px 10px;
+  width: 100%;
+}
+.wh-input-lead { font-family: var(--fc-font-mono); text-align: center; }
+.wh-input:focus { outline: none; border-color: var(--fc-navy); }
+.wh-input-lead::-webkit-outer-spin-button,
+.wh-input-lead::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.wh-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  background: transparent;
+  border: 1px solid var(--fc-ink-100);
+  border-radius: var(--fc-radius-2);
+  color: var(--fc-ink-500);
+  cursor: pointer;
+  transition: color var(--fc-dur-fast), border-color var(--fc-dur-fast), background var(--fc-dur-fast);
+}
+.wh-remove:hover { color: var(--fc-danger); border-color: var(--fc-danger-light); background: rgba(168,53,28,.06); }
+.wh-remove svg { width: 15px; height: 15px; stroke-width: 1.9; }
+
+.wh-empty { font-family: var(--fc-font-body); font-size: var(--fc-fs-14); color: var(--fc-ink-500); padding: 4px 0 8px; }
+
+.wh-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 14px;
+  font-family: var(--fc-font-body);
+  font-size: var(--fc-fs-12);
+  font-weight: var(--fc-fw-semibold);
+  letter-spacing: var(--fc-ls-loose);
+  background: transparent;
+  color: var(--fc-navy);
+  border: 1px dashed var(--fc-ink-200);
+  border-radius: var(--fc-radius-2);
+  cursor: pointer;
+  transition: background var(--fc-dur-fast), border-color var(--fc-dur-fast);
+}
+.wh-add:hover { background: var(--fc-cream); border-color: var(--fc-navy); }
+.wh-add svg { width: 15px; height: 15px; stroke-width: 2; }
+
+@media (max-width: 767px) {
+  .wh-row { grid-template-columns: 36px 1fr 96px 38px; gap: 6px; }
+}
+
 /* --- Export button ------------------------------------------------------ */
 .export-bar { margin-top: var(--fc-space-8); }
 .btn {

@@ -32,6 +32,18 @@ hatches exist and no others should be added:
 Markets declare `target` and `arrivalDelay` in `src/data/markets.js`. MENA and
 AU carry `arrivalDelay: 1`.
 
+### Warehouses drive the arrival delay
+
+Each market delivers into named **warehouses**, each with a `lead` (months from
+despacho to landing). Seeds live in `src/data/warehouses.js`; the **Bodegas** tab
+edits them and persists per market (scope `warehouse`, one row each). The
+market's **primary** warehouse lead time drives arrival timing via
+`marketArrivalDelay(market, cfg)` in `model.js` = `round(primaryLead) −
+despachoToEntrega`, falling back to the static `arrivalDelay` when a market has
+no warehouse. Lead may be fractional (Annex = 1.5); the exact value is stored,
+the monthly grid rounds it. This is the only sanctioned way arrival timing
+varies per market now — do not reintroduce hardcoded per-market offsets in views.
+
 ### Campaigns are a property of the cutoff, not the region
 
 `CAMPAIGNS` in `model.js` maps cutoff months to a campaign window. A region can
@@ -77,13 +89,15 @@ src/
   data/
     regions.js       harvest declarations only
     markets.js       targets and transit delays
+    warehouses.js    destination warehouses + lead times (seed defaults)
     products.js      catalogue keyed by cutoff month
   views/
     consolidado.js   supply vs demand reconciliation
     cosechas.js      read-only overview of every origin at once ("Cosechas" tab)
     regionesEditor.js  region picker + editable grid ("Editar regiones" tab)
     region.js        per-origin grid (used by regionesEditor)
-    market.js        per-market gantt
+    market.js        per-market gantt + warehouse panel
+    bodegas.js       edit warehouses + lead times per destination ("Bodegas" tab)
     products.js      releases per cutoff
   main.js            router, tabs, state
   forest-design-system.css  Forest Design System v1.0 (shell, tokens)

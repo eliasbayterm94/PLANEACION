@@ -108,18 +108,46 @@ export function primaryCampaign(schedule) {
 }
 
 // ---------------------------------------------------------------------------
+// Warehouses — destination lead time drives arrival timing
+// ---------------------------------------------------------------------------
+/**
+ * Lead time (months, despacho -> landing) of a market's primary warehouse, or
+ * null when the market has no warehouse configured.
+ * @param cfg  { primary: string|null, warehouses: [{ name, lead }] }
+ */
+export function warehousePrimaryLead(cfg) {
+  if (!cfg || !cfg.primary || !Array.isArray(cfg.warehouses)) return null;
+  const w = cfg.warehouses.find((x) => x.name === cfg.primary);
+  const lead = w ? Number(w.lead) : NaN;
+  return Number.isFinite(lead) ? lead : null;
+}
+
+/**
+ * Extra transit months beyond the 1-month base Colombia lane, for a market.
+ * Driven by the primary warehouse lead time when present (rounded to a whole
+ * month for the calendar grid), falling back to the static `arrivalDelay`.
+ */
+export function marketArrivalDelay(market, cfg) {
+  const lead = warehousePrimaryLead(cfg);
+  if (lead != null) return Math.max(0, Math.round(lead) - OFFSETS.despachoToEntrega);
+  return market.arrivalDelay || 0;
+}
+
+// ---------------------------------------------------------------------------
 // Market chains
 // ---------------------------------------------------------------------------
 /**
  * For a market, build the chain of cutoff -> landing.
  *
- * `arrivalDelay` (extra transit for MENA / AU) is applied to BOTH the landing
- * month and the label shown on the cutoff cell. In the original prototype it
- * was applied only to the arrivals row, so MENA and AU cutoff cells advertised
- * a landing month one month earlier than reality.
+ * The extra transit delay (MENA / AU, or any market whose primary warehouse
+ * lands later) is applied to BOTH the landing month and the label shown on the
+ * cutoff cell. In the original prototype it was applied only to the arrivals
+ * row, so those cutoff cells advertised a landing month one month early.
+ *
+ * @param cfg  optional warehouse config; its primary lead overrides arrivalDelay
  */
-export function marketChains(market) {
-  const delay = market.arrivalDelay || 0;
+export function marketChains(market, cfg) {
+  const delay = marketArrivalDelay(market, cfg);
   const lead = corteToEntrega();
   const chains = [];
 
@@ -138,9 +166,9 @@ export function marketChains(market) {
 }
 
 /** Index a market's chains by the month the cutoff happens. */
-export function chainsByCorte(market) {
+export function chainsByCorte(market, cfg) {
   const map = {};
-  marketChains(market).forEach((c) => { map[c.corteMonth] = c; });
+  marketChains(market, cfg).forEach((c) => { map[c.corteMonth] = c; });
   return map;
 }
 
@@ -157,7 +185,7 @@ export function chainsByCorte(market) {
  * @param marketQty  { slug: { monthIndex: containers } }  entered on the cutoff row
  * @returns { byMonth: [{ month, supply, demand, delta }], totals }
  */
-export function reconcile(schedules, regionQty, markets, marketQty) {
+export function reconcile(schedules, regionQty, markets, marketQty, warehouses = {}) {
   const supply = new Array(12).fill(0);
   const demand = new Array(12).fill(0);
 
@@ -171,7 +199,7 @@ export function reconcile(schedules, regionQty, markets, marketQty) {
 
   markets.forEach((mk) => {
     const q = marketQty[mk.slug] || {};
-    const chains = chainsByCorte(mk);
+    const chains = chainsByCorte(mk, warehouses[mk.slug]);
     Object.entries(chains).forEach(([corteMonth, chain]) => {
       const n = Number(q[corteMonth]) || 0;
       if (n) demand[chain.arrivalMonth] += n;

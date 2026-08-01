@@ -50,10 +50,12 @@ export async function loadPlan() {
     return { ...readLocal(), error: error.message };
   }
 
-  const plan = { region: {}, market: {} };
+  const plan = { region: {}, market: {}, warehouse: {} };
   (data || []).forEach((row) => {
     if (!plan[row.scope]) plan[row.scope] = {};
-    plan[row.scope][row.slug] = normalise(row.months);
+    // Warehouse rows hold a config object, not a numeric month map.
+    plan[row.scope][row.slug] =
+      row.scope === 'warehouse' ? row.months : normalise(row.months);
   });
 
   writeLocal(plan); // keep an offline mirror
@@ -68,9 +70,9 @@ const timers = new Map();
 
 /**
  * Queue a save for one slug. Coalesces rapid edits into a single upsert.
- * @param {'region'|'market'} scope
+ * @param {'region'|'market'|'warehouse'} scope
  * @param {string} slug
- * @param {Object} months  full month map for that slug
+ * @param {Object} months  full month map for that slug (or config for 'warehouse')
  * @param {(status: 'saving'|'saved'|'error', detail?: string) => void} onStatus
  */
 export function savePlanSlug(scope, slug, months, onStatus = () => {}) {
@@ -111,6 +113,14 @@ export function savePlanSlug(scope, slug, months, onStatus = () => {}) {
   );
 }
 
+/**
+ * Persist a market's warehouse config (list + primary). One row per market,
+ * scope 'warehouse'; the value is a config object, not a month map.
+ */
+export function saveWarehouse(slug, config, onStatus = () => {}) {
+  savePlanSlug('warehouse', slug, config, onStatus);
+}
+
 // ---------------------------------------------------------------------------
 // Realtime — so the team sees each other's edits during a planning session
 // ---------------------------------------------------------------------------
@@ -125,7 +135,8 @@ export function subscribeToPlan(onChange) {
       (payload) => {
         const row = payload.new;
         if (!row) return;
-        onChange(row.scope, row.slug, normalise(row.months), row.updated_by);
+        const value = row.scope === 'warehouse' ? row.months : normalise(row.months);
+        onChange(row.scope, row.slug, value, row.updated_by);
       },
     )
     .subscribe();
@@ -140,9 +151,13 @@ function readLocal() {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
-    return { region: parsed.region || {}, market: parsed.market || {} };
+    return {
+      region: parsed.region || {},
+      market: parsed.market || {},
+      warehouse: parsed.warehouse || {},
+    };
   } catch {
-    return { region: {}, market: {} };
+    return { region: {}, market: {}, warehouse: {} };
   }
 }
 

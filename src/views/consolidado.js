@@ -1,6 +1,6 @@
 import {
   MONTHS, monthName, reconcile, primaryCampaign, CAMPAIGNS,
-  marketProgress, mod12,
+  marketProgress, mod12, marketArrivalDelay,
 } from '../model.js';
 import { downloadCSV } from '../store.js';
 
@@ -11,17 +11,17 @@ import { downloadCSV } from '../store.js';
  * with nothing checking them against each other. This surfaces the delta by
  * month so a gap shows up while there is still time to act on it.
  */
-export function renderConsolidado({ schedules, markets, regionQty, marketQty }) {
+export function renderConsolidado({ schedules, markets, regionQty, marketQty, warehouses = {} }) {
   const el = document.createElement('div');
-  const rec = reconcile(schedules, regionQty, markets, marketQty);
+  const rec = reconcile(schedules, regionQty, markets, marketQty, warehouses);
 
   el.appendChild(header(rec));
   el.appendChild(balanceGrid(rec));
   el.appendChild(sectionTitle('Origen — llegadas por región'));
   el.appendChild(regionGrid(schedules, regionQty));
   el.appendChild(sectionTitle('Destino — llegadas por mercado'));
-  el.appendChild(marketGrid(markets, marketQty));
-  el.appendChild(exportBar(schedules, markets, regionQty, marketQty, rec));
+  el.appendChild(marketGrid(markets, marketQty, warehouses));
+  el.appendChild(exportBar(schedules, markets, regionQty, marketQty, rec, warehouses));
   return el;
 }
 
@@ -130,13 +130,14 @@ function regionGrid(schedules, regionQty) {
   return g;
 }
 
-function marketGrid(markets, marketQty) {
+function marketGrid(markets, marketQty, warehouses) {
   const g = document.createElement('div');
   g.className = 'grid grid--consolidado';
   headRow(g);
 
   markets.forEach((mk) => {
     const p = marketProgress(mk, marketQty);
+    const delay = marketArrivalDelay(mk, warehouses[mk.slug]);
     const l = document.createElement('div');
     l.className = 'row-label';
     l.innerHTML = `${mk.name} <span class="row-meta ${p.over ? 'row-meta--over' : ''}">${p.allocated}/${p.target}</span>`;
@@ -145,7 +146,7 @@ function marketGrid(markets, marketQty) {
     const q = marketQty[mk.slug] || {};
     const landed = new Array(12).fill(0);
     Object.entries(q).forEach(([corteMonth, n]) => {
-      const arrival = mod12(Number(corteMonth) + 2 + (mk.arrivalDelay || 0));
+      const arrival = mod12(Number(corteMonth) + 2 + delay);
       landed[arrival] += Number(n) || 0;
     });
 
@@ -176,7 +177,7 @@ function headRow(g) {
   });
 }
 
-function exportBar(schedules, markets, regionQty, marketQty, rec) {
+function exportBar(schedules, markets, regionQty, marketQty, rec, warehouses) {
   const bar = document.createElement('div');
   bar.className = 'export-bar';
 
@@ -198,9 +199,10 @@ function exportBar(schedules, markets, regionQty, marketQty, rec) {
 
     markets.forEach((mk) => {
       const q = marketQty[mk.slug] || {};
+      const delay = marketArrivalDelay(mk, warehouses[mk.slug]);
       const landed = new Array(12).fill(0);
       Object.entries(q).forEach(([m, n]) => {
-        landed[mod12(Number(m) + 2 + (mk.arrivalDelay || 0))] += Number(n) || 0;
+        landed[mod12(Number(m) + 2 + delay)] += Number(n) || 0;
       });
       rows.push(['Destino', mk.name, ...landed, landed.reduce((a, b) => a + b, 0)]);
     });

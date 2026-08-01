@@ -1,37 +1,68 @@
 import {
   MONTHS, monthName, CAMPAIGNS, chainsByCorte, marketProgress, CUTOFF_DAY,
+  marketArrivalDelay, warehousePrimaryLead,
 } from '../model.js';
 
 /**
  * Market view — the destination side.
  * Containers are entered on the CUTOFF row. The arrivals row is derived,
- * including `arrivalDelay` for MENA and AU, and the cutoff cell label shows
- * the DELAYED landing month (the original prototype showed the undelayed one,
- * which meant MENA/AU cells advertised dates a month early).
+ * and the extra transit now comes from the market's PRIMARY warehouse lead
+ * time (see the Bodegas tab), falling back to the static arrivalDelay. The
+ * cutoff cell label shows the DELAYED landing month, so it never advertises a
+ * date a month early as the original prototype did.
  */
-export function renderMarket({ market, qty, onQty }) {
+export function renderMarket({ market, qty, onQty, warehouses }) {
   const el = document.createElement('div');
-  const chains = chainsByCorte(market);
+  const chains = chainsByCorte(market, warehouses);
   const progress = marketProgress(market, { [market.slug]: qty });
 
-  el.appendChild(header(market, progress));
+  el.appendChild(header(market, progress, warehouses));
+  if (warehouses && warehouses.warehouses?.length) {
+    el.appendChild(warehousePanel(market, warehouses));
+  }
   el.appendChild(grid(market, chains, qty, onQty));
   return el;
 }
 
-function header(mk, p) {
+function header(mk, p, cfg) {
   const wrap = document.createElement('div');
   wrap.className = 'view-head';
   const state = p.over ? 'over' : p.remaining === 0 ? 'exact' : 'under';
+  const delay = marketArrivalDelay(mk, cfg);
+  const lead = warehousePrimaryLead(cfg);
+  const transitNote = lead != null
+    ? ` · Tránsito ${leadLabel(lead)} (bodega principal)`
+    : (delay ? ` · +${delay} mes de tránsito` : '');
   wrap.innerHTML = `
     <h2>${mk.name}</h2>
     <p class="view-sub">
       Meta anual <strong>${p.target}</strong> ·
       Asignados <strong class="tally tally--${state}">${p.allocated}</strong> ·
       ${p.over ? `Excedido en ${Math.abs(p.remaining)}` : `Faltan ${p.remaining}`}
-      ${mk.arrivalDelay ? ` · +${mk.arrivalDelay} mes de tránsito` : ''} ·
+      ${transitNote} ·
       Cortes el día ${CUTOFF_DAY}
     </p>`;
+  return wrap;
+}
+
+function leadLabel(lead) {
+  const n = Number(lead);
+  return `${n % 1 === 0 ? n : n.toFixed(1)} ${n === 1 ? 'mes' : 'meses'}`;
+}
+
+/** Reference panel: the market's warehouses and their lead times. */
+function warehousePanel(mk, cfg) {
+  const wrap = document.createElement('div');
+  wrap.className = 'wh-panel';
+  cfg.warehouses.forEach((w) => {
+    const chip = document.createElement('div');
+    chip.className = 'wh-chip' + (w.name === cfg.primary ? ' wh-chip--primary' : '');
+    chip.innerHTML =
+      `<span class="wh-chip-name">${w.name}</span>` +
+      `<span class="wh-chip-lead">${leadLabel(w.lead)}</span>` +
+      (w.name === cfg.primary ? `<span class="wh-chip-tag">Principal</span>` : '');
+    wrap.appendChild(chip);
+  });
   return wrap;
 }
 
