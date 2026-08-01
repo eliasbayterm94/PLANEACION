@@ -234,12 +234,14 @@ export const GOAL_CATEGORIES = [
 
 /**
  * Goals shape:
- *   { markets: { marketSlug: { community, mirc } },  // by SALES region (demand)
- *     countriesMIRC: { country: kg } }               // MIRC by PRODUCING country
- * Community/MIRC targets live on the sales region (market); the MIRC country
- * target lives on the producing country (region.country).
+ *   { markets:    { marketSlug: { community, mirc } }, // by SALES region (demand)
+ *     warehouses: { whName:     { community, mirc } }, // for markets entered by warehouse (Europa)
+ *     countriesMIRC: { country: kg } }                 // MIRC by PRODUCING country
+ * Community/MIRC targets live on the sales region (market), or per warehouse when
+ * the market has `goalsByWarehouse`. The MIRC country target lives on the
+ * producing country (region.country).
  */
-export const emptyGoals = () => ({ markets: {}, countriesMIRC: {} });
+export const emptyGoals = () => ({ markets: {}, warehouses: {}, countriesMIRC: {} });
 
 /** Distinct producing countries, in declaration order. */
 export function listCountries(regions = []) {
@@ -256,6 +258,20 @@ export function marketGoal(goals, marketSlug, category) {
 /** Total kg goal (community + mirc) for a sales region. */
 export function marketGoalTotal(goals, marketSlug) {
   return marketGoal(goals, marketSlug, 'community') + marketGoal(goals, marketSlug, 'mirc');
+}
+
+/** kg goal for a warehouse (markets entered by warehouse, e.g. Europa). */
+export function warehouseGoal(goals, whName, category) {
+  return Number(goals?.warehouses?.[whName]?.[category]) || 0;
+}
+
+export function warehouseGoalTotal(goals, whName) {
+  return warehouseGoal(goals, whName, 'community') + warehouseGoal(goals, whName, 'mirc');
+}
+
+/** Containers landing in one warehouse, across all regions' shipments. */
+export function warehouseAllocatedAll(shipments, whName) {
+  return Object.values(shipments || {}).reduce((s, rs) => s + warehouseAllocated(rs, whName), 0);
 }
 
 /** Containers shipped from a producing country's regions (all warehouses). */

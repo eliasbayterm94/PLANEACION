@@ -1,22 +1,26 @@
 import {
-  listCountries, marketGoal, marketGoalTotal, countrySalidas,
-  marketShipmentArrivals, containersToKg,
+  listCountries, marketGoal, marketGoalTotal, warehouseGoal, warehouseGoalTotal,
+  countrySalidas, marketShipmentArrivals, warehouseAllocatedAll, containersToKg,
 } from '../model.js';
 
 /**
  * Metas — kg goals for the plan, on two axes:
  *
- *  1. Per SALES region (market): Community + MIRC kg. This is the demand plan.
+ *  1. Per SALES region (market): Community + MIRC kg. Most markets enter one
+ *     market-level goal; markets flagged `goalsByWarehouse` (Europa) enter a
+ *     goal per warehouse (Rotterdam, UK) instead.
  *  2. MIRC target per PRODUCING country (Colombia, Rwanda). Community has no
  *     country target (demand-driven).
  *
  * Salidas/llegadas (containers) are shown in kg as context; they are not yet
  * split by category.
  */
-export function renderMetas({ schedules, markets, goals, shipments, leadLookup, onMarketGoal, onCountryMirc }) {
+export function renderMetas({
+  schedules, markets, warehouses, goals, shipments, leadLookup, onMarketGoal, onWarehouseGoal, onCountryMirc,
+}) {
   const el = document.createElement('div');
   el.appendChild(header());
-  el.appendChild(marketCard(markets, goals, shipments, leadLookup, onMarketGoal));
+  el.appendChild(marketCard(markets, warehouses, goals, shipments, leadLookup, onMarketGoal, onWarehouseGoal));
   el.appendChild(countryCard(schedules, goals, shipments, leadLookup, onCountryMirc));
   return el;
 }
@@ -28,16 +32,52 @@ function header() {
     <h2>Metas 2027</h2>
     <p class="view-sub">
       Meta en kg por <strong>región de venta</strong> (mercado), en dos categorías:
-      <strong>Community</strong> y <strong>MIRC</strong>. Además, una meta de
+      <strong>Community</strong> y <strong>MIRC</strong>. Europa se ingresa
+      <strong>por bodega</strong> (Rotterdam, UK). Además, una meta de
       <strong>MIRC por país productor</strong> (Colombia, Rwanda);
-      <strong>Community</strong> va por demanda y proyecciones (sin meta de país).
+      <strong>Community</strong> va por demanda (sin meta de país).
       Las salidas/llegadas se muestran en kg como referencia.
     </p>`;
   return wrap;
 }
 
-/** Section 1: Community + MIRC goals per sales region (market). */
-function marketCard(markets, goals, shipments, leadLookup, onMarketGoal) {
+function goalRow({ label, indent, community, mirc, total, context, onCommunity, onMirc, ariaBase }) {
+  const row = document.createElement('div');
+  row.className = 'metas-row' + (indent ? ' metas-row--sub' : '');
+
+  const name = document.createElement('span');
+  name.className = 'metas-region';
+  name.textContent = label;
+  row.appendChild(name);
+
+  [['community', community, onCommunity], ['mirc', mirc, onMirc]].forEach(([cat, val, cb]) => {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.step = '1000';
+    input.className = 'metas-input';
+    input.value = val || '';
+    input.placeholder = '0';
+    input.setAttribute('aria-label', `Meta ${cat} de ${ariaBase} en kg`);
+    input.addEventListener('change', (e) => cb(Math.max(0, Number(e.target.value) || 0)));
+    row.appendChild(input);
+  });
+
+  const tot = document.createElement('span');
+  tot.className = 'metas-total';
+  tot.textContent = fmtKg(total);
+  row.appendChild(tot);
+
+  const ctx = document.createElement('span');
+  ctx.className = 'metas-salidas';
+  ctx.textContent = fmtKg(context);
+  row.appendChild(ctx);
+
+  return row;
+}
+
+/** Section 1: Community + MIRC goals per sales region (market or warehouse). */
+function marketCard(markets, warehouses, goals, shipments, leadLookup, onMarketGoal, onWarehouseGoal) {
   const card = document.createElement('section');
   card.className = 'wh-card';
 
@@ -49,48 +89,49 @@ function marketCard(markets, goals, shipments, leadLookup, onMarketGoal) {
   const heads = document.createElement('div');
   heads.className = 'metas-row metas-row--head';
   heads.innerHTML =
-    '<span>Mercado</span><span>Community (kg)</span><span>MIRC (kg)</span><span>Total</span><span>Llegadas</span>';
+    '<span>Mercado / bodega</span><span>Community (kg)</span><span>MIRC (kg)</span><span>Total</span><span>Llegadas</span>';
   card.appendChild(heads);
 
   let totCommunity = 0;
   let totMirc = 0;
+
   markets.forEach((mk) => {
-    totCommunity += marketGoal(goals, mk.slug, 'community');
-    totMirc += marketGoal(goals, mk.slug, 'mirc');
+    if (mk.goalsByWarehouse) {
+      // Market subheader + one row per warehouse.
+      const sub = document.createElement('div');
+      sub.className = 'group-label';
+      sub.textContent = mk.name;
+      card.appendChild(sub);
 
-    const row = document.createElement('div');
-    row.className = 'metas-row';
-
-    const name = document.createElement('span');
-    name.className = 'metas-region';
-    name.textContent = mk.name;
-    row.appendChild(name);
-
-    ['community', 'mirc'].forEach((cat) => {
-      const input = document.createElement('input');
-      input.type = 'number';
-      input.min = '0';
-      input.step = '1000';
-      input.className = 'metas-input';
-      input.value = marketGoal(goals, mk.slug, cat) || '';
-      input.placeholder = '0';
-      input.setAttribute('aria-label', `Meta ${cat} de ${mk.name} en kg`);
-      input.addEventListener('change', (e) => onMarketGoal(mk.slug, cat, Math.max(0, Number(e.target.value) || 0)));
-      row.appendChild(input);
-    });
-
-    const total = document.createElement('span');
-    total.className = 'metas-total';
-    total.textContent = fmtKg(marketGoalTotal(goals, mk.slug));
-    row.appendChild(total);
-
-    const arr = marketShipmentArrivals(shipments, leadLookup, mk.slug).allocated;
-    const llegadas = document.createElement('span');
-    llegadas.className = 'metas-salidas';
-    llegadas.textContent = fmtKg(containersToKg(arr));
-    row.appendChild(llegadas);
-
-    card.appendChild(row);
+      (warehouses[mk.slug]?.warehouses || []).forEach((w) => {
+        totCommunity += warehouseGoal(goals, w.name, 'community');
+        totMirc += warehouseGoal(goals, w.name, 'mirc');
+        card.appendChild(goalRow({
+          label: w.name,
+          indent: true,
+          community: warehouseGoal(goals, w.name, 'community'),
+          mirc: warehouseGoal(goals, w.name, 'mirc'),
+          total: warehouseGoalTotal(goals, w.name),
+          context: containersToKg(warehouseAllocatedAll(shipments, w.name)),
+          onCommunity: (kg) => onWarehouseGoal(w.name, 'community', kg),
+          onMirc: (kg) => onWarehouseGoal(w.name, 'mirc', kg),
+          ariaBase: w.name,
+        }));
+      });
+    } else {
+      totCommunity += marketGoal(goals, mk.slug, 'community');
+      totMirc += marketGoal(goals, mk.slug, 'mirc');
+      card.appendChild(goalRow({
+        label: mk.name,
+        community: marketGoal(goals, mk.slug, 'community'),
+        mirc: marketGoal(goals, mk.slug, 'mirc'),
+        total: marketGoalTotal(goals, mk.slug),
+        context: containersToKg(marketShipmentArrivals(shipments, leadLookup, mk.slug).allocated),
+        onCommunity: (kg) => onMarketGoal(mk.slug, 'community', kg),
+        onMirc: (kg) => onMarketGoal(mk.slug, 'mirc', kg),
+        ariaBase: mk.name,
+      }));
+    }
   });
 
   const foot = document.createElement('p');
@@ -140,8 +181,7 @@ function countryCard(schedules, goals, shipments, leadLookup, onCountryMirc) {
 
     const salidas = document.createElement('span');
     salidas.className = 'metas-salidas';
-    const cont = countrySalidas(shipments, schedules, country, leadLookup);
-    salidas.textContent = fmtKg(containersToKg(cont));
+    salidas.textContent = fmtKg(containersToKg(countrySalidas(shipments, schedules, country, leadLookup)));
     row.appendChild(salidas);
 
     card.appendChild(row);

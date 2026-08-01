@@ -296,6 +296,8 @@
   text-transform: uppercase;
   color: var(--fc-ink-500);
 }
+.metas-row--country { grid-template-columns: minmax(120px, 1.4fr) 1fr 110px; }
+.metas-row--sub .metas-region { padding-left: 16px; font-weight: var(--fc-fw-regular); }
 .metas-region {
   font-family: var(--fc-font-body);
   font-size: var(--fc-fs-14);

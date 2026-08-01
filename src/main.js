@@ -121,6 +121,7 @@ function saveGoalsState(value) {
 function goalsCopy() {
   return {
     markets: { ...(state.goals.markets || {}) },
+    warehouses: { ...(state.goals.warehouses || {}) },
     countriesMIRC: { ...(state.goals.countriesMIRC || {}) },
   };
 }
@@ -128,6 +129,12 @@ function goalsCopy() {
 function setMarketGoal(marketSlug, category, kg) {
   const g = goalsCopy();
   g.markets[marketSlug] = { ...(g.markets[marketSlug] || {}), [category]: kg };
+  saveGoalsState(g);
+}
+
+function setWarehouseGoal(whName, category, kg) {
+  const g = goalsCopy();
+  g.warehouses[whName] = { ...(g.warehouses[whName] || {}), [category]: kg };
   saveGoalsState(g);
 }
 
@@ -196,10 +203,12 @@ function renderView() {
   } else if (kind === 'metas') {
     root.appendChild(renderMetas({
       schedules, markets,
+      warehouses: state.warehouses,
       goals: state.goals,
       shipments: state.shipments,
       leadLookup,
       onMarketGoal: (slug, category, kg) => setMarketGoal(slug, category, kg),
+      onWarehouseGoal: (wh, category, kg) => setWarehouseGoal(wh, category, kg),
       onCountryMirc: (country, kg) => setCountryMirc(country, kg),
     }));
   } else if (kind === 'cosechas') {
