@@ -191,12 +191,53 @@
 }
 .grid--consolidado { grid-template-columns: 150px repeat(12, minmax(0, 1fr)); }
 
-/* Cosechas overview: many stacked rows, so keep them compact. */
-.grid--cosechas .cell,
-.grid--cosechas .row-label { min-height: 32px; }
-.grid--cosechas .cell--num,
-.grid--cosechas .cell--mirror { font-size: var(--fc-fs-12); }
-.grid--cosechas .cell-tag svg { width: 13px; height: 13px; }
+/* Cosechas Gantt: one row per region, months + a total column. */
+.gantt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: var(--fc-space-5);
+}
+.gantt-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--fc-font-body);
+  font-size: var(--fc-fs-11);
+  font-weight: var(--fc-fw-medium);
+  color: var(--fc-ink-500);
+}
+.gantt-legend-item svg { width: 15px; height: 15px; color: var(--fc-navy); stroke-width: 1.9; }
+
+.grid--gantt { grid-template-columns: 168px repeat(12, minmax(0, 1fr)) 66px; }
+.grid--gantt .cell, .grid--gantt .row-label { min-height: 48px; }
+.grid--gantt .row-label { justify-content: flex-start; gap: 0; }
+
+.camp-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 9px;
+  flex-shrink: 0;
+}
+
+.gantt-cell-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+}
+.gantt-cell-icons svg { width: 14px; height: 14px; color: var(--fc-navy); stroke-width: 1.9; }
+
+.gantt-total-head { color: var(--fc-navy); }
+.gantt-total {
+  font-family: var(--fc-font-mono);
+  font-feature-settings: "tnum";
+  font-size: var(--fc-fs-14);
+  font-weight: var(--fc-fw-semibold);
+  color: var(--fc-navy);
+}
 
 .month-head {
   font-family: var(--fc-font-display);
@@ -405,6 +446,10 @@
   .grid, .grid--consolidado {
     grid-template-columns: 96px repeat(12, minmax(34px, 1fr));
     min-width: 520px;
+  }
+  .grid--gantt {
+    grid-template-columns: 120px repeat(12, minmax(34px, 1fr)) 56px;
+    min-width: 620px;
   }
   .fp-footer { padding: var(--fc-space-4) var(--fc-space-3) 80px; }
 }
