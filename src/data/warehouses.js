@@ -39,10 +39,6 @@ export const defaultWarehouses = {
     primary: 'Dubai',
     warehouses: [{ name: 'Dubai', lead: 2 }],
   },
-  uk: {
-    primary: null,
-    warehouses: [],
-  },
 };
 
 /** A blank config for a market with no warehouses yet. */
