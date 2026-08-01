@@ -41,6 +41,38 @@ function header() {
   return wrap;
 }
 
+/** A labelled cell: the label shows on mobile (the column header hides there). */
+function field(labelText, node) {
+  const wrap = document.createElement('div');
+  wrap.className = 'metas-field';
+  const lab = document.createElement('span');
+  lab.className = 'metas-field-label';
+  lab.textContent = labelText;
+  wrap.appendChild(lab);
+  wrap.appendChild(node);
+  return wrap;
+}
+
+function goalInput(category, value, cb, ariaBase) {
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0';
+  input.step = '1000';
+  input.className = 'metas-input';
+  input.value = value || '';
+  input.placeholder = '0';
+  input.setAttribute('aria-label', `Meta ${category} de ${ariaBase} en kg`);
+  input.addEventListener('change', (e) => cb(Math.max(0, Number(e.target.value) || 0)));
+  return input;
+}
+
+function valueSpan(cls, text) {
+  const s = document.createElement('span');
+  s.className = cls;
+  s.textContent = text;
+  return s;
+}
+
 function goalRow({ label, indent, community, mirc, total, context, onCommunity, onMirc, ariaBase }) {
   const row = document.createElement('div');
   row.className = 'metas-row' + (indent ? ' metas-row--sub' : '');
@@ -50,28 +82,10 @@ function goalRow({ label, indent, community, mirc, total, context, onCommunity, 
   name.textContent = label;
   row.appendChild(name);
 
-  [['community', community, onCommunity], ['mirc', mirc, onMirc]].forEach(([cat, val, cb]) => {
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.min = '0';
-    input.step = '1000';
-    input.className = 'metas-input';
-    input.value = val || '';
-    input.placeholder = '0';
-    input.setAttribute('aria-label', `Meta ${cat} de ${ariaBase} en kg`);
-    input.addEventListener('change', (e) => cb(Math.max(0, Number(e.target.value) || 0)));
-    row.appendChild(input);
-  });
-
-  const tot = document.createElement('span');
-  tot.className = 'metas-total';
-  tot.textContent = fmtKg(total);
-  row.appendChild(tot);
-
-  const ctx = document.createElement('span');
-  ctx.className = 'metas-salidas';
-  ctx.textContent = fmtKg(context);
-  row.appendChild(ctx);
+  row.appendChild(field('Community (kg)', goalInput('community', community, onCommunity, ariaBase)));
+  row.appendChild(field('MIRC (kg)', goalInput('mirc', mirc, onMirc, ariaBase)));
+  row.appendChild(field('Total', valueSpan('metas-total', fmtKg(total))));
+  row.appendChild(field('Llegadas', valueSpan('metas-salidas', fmtKg(context))));
 
   return row;
 }
@@ -177,12 +191,10 @@ function countryCard(schedules, goals, shipments, leadLookup, onCountryMirc) {
     input.placeholder = '0';
     input.setAttribute('aria-label', `Meta MIRC de ${country} en kg`);
     input.addEventListener('change', (e) => onCountryMirc(country, Math.max(0, Number(e.target.value) || 0)));
-    row.appendChild(input);
+    row.appendChild(field('Meta MIRC (kg)', input));
 
-    const salidas = document.createElement('span');
-    salidas.className = 'metas-salidas';
-    salidas.textContent = fmtKg(containersToKg(countrySalidas(shipments, schedules, country, leadLookup)));
-    row.appendChild(salidas);
+    const cont = countrySalidas(shipments, schedules, country, leadLookup);
+    row.appendChild(field('Salidas', valueSpan('metas-salidas', fmtKg(containersToKg(cont)))));
 
     card.appendChild(row);
   });

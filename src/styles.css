@@ -298,6 +298,10 @@
 }
 .metas-row--country { grid-template-columns: minmax(120px, 1.4fr) 1fr 110px; }
 .metas-row--sub .metas-region { padding-left: 16px; font-weight: var(--fc-fw-regular); }
+
+/* Labelled cell wrapper. Label shows only on mobile (header row hides there). */
+.metas-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.metas-field-label { display: none; }
 .metas-region {
   font-family: var(--fc-font-body);
   font-size: var(--fc-fs-14);
@@ -332,9 +336,19 @@
 .metas-foot strong { color: var(--fc-navy); font-family: var(--fc-font-mono); }
 
 @media (max-width: 767px) {
-  .metas-row { grid-template-columns: 1fr 1fr; }
+  .metas-row { grid-template-columns: 1fr 1fr; row-gap: 12px; }
   .metas-row--head { display: none; }
   .metas-region { grid-column: 1 / -1; font-weight: var(--fc-fw-semibold); }
+  .metas-field-label {
+    display: block;
+    font-family: var(--fc-font-display);
+    font-size: 9px;
+    font-weight: var(--fc-fw-bold);
+    letter-spacing: var(--fc-ls-eyebrow);
+    text-transform: uppercase;
+    color: var(--fc-ink-500);
+  }
+  .metas-total, .metas-salidas { text-align: left; }
 }
 
 /* --- Calendar grid ------------------------------------------------------ */
