@@ -1,25 +1,23 @@
 import {
-  listCountries, regionGoal, regionGoalTotal, countryPlanned,
-  regionShipmentSummary, containersToKg,
+  listCountries, marketGoal, marketGoalTotal, countrySalidas,
+  marketShipmentArrivals, containersToKg,
 } from '../model.js';
 
 /**
- * Metas — kg goals for the plan.
+ * Metas — kg goals for the plan, on two axes:
  *
- * Two macro categories per region: Community and MIRC. Community is
- * demand-driven (no country target); MIRC additionally rolls up to a
- * country-level target (Colombia, Rwanda). Salidas (containers shipped) are
- * shown in kg as context, but are not yet split by category.
+ *  1. Per SALES region (market): Community + MIRC kg. This is the demand plan.
+ *  2. MIRC target per PRODUCING country (Colombia, Rwanda). Community has no
+ *     country target (demand-driven).
+ *
+ * Salidas/llegadas (containers) are shown in kg as context; they are not yet
+ * split by category.
  */
-export function renderMetas({ schedules, goals, shipments, leadLookup, onRegionGoal, onCountryMirc }) {
+export function renderMetas({ schedules, markets, goals, shipments, leadLookup, onMarketGoal, onCountryMirc }) {
   const el = document.createElement('div');
   el.appendChild(header());
-
-  const countries = listCountries(schedules);
-  countries.forEach((country) => {
-    el.appendChild(countryCard(country, schedules, goals, shipments, leadLookup, onRegionGoal, onCountryMirc));
-  });
-
+  el.appendChild(marketCard(markets, goals, shipments, leadLookup, onMarketGoal));
+  el.appendChild(countryCard(schedules, goals, shipments, leadLookup, onCountryMirc));
   return el;
 }
 
@@ -29,73 +27,43 @@ function header() {
   wrap.innerHTML = `
     <h2>Metas 2027</h2>
     <p class="view-sub">
-      Meta en kg por región, en dos categorías: <strong>Community</strong> y
-      <strong>MIRC</strong>. La meta de <strong>MIRC</strong> tiene además un
-      objetivo por país; <strong>Community</strong> va por demanda y proyecciones
-      (sin meta de país). Las salidas se muestran en kg como referencia.
+      Meta en kg por <strong>región de venta</strong> (mercado), en dos categorías:
+      <strong>Community</strong> y <strong>MIRC</strong>. Además, una meta de
+      <strong>MIRC por país productor</strong> (Colombia, Rwanda);
+      <strong>Community</strong> va por demanda y proyecciones (sin meta de país).
+      Las salidas/llegadas se muestran en kg como referencia.
     </p>`;
   return wrap;
 }
 
-function countryCard(country, schedules, goals, shipments, leadLookup, onRegionGoal, onCountryMirc) {
+/** Section 1: Community + MIRC goals per sales region (market). */
+function marketCard(markets, goals, shipments, leadLookup, onMarketGoal) {
   const card = document.createElement('section');
   card.className = 'wh-card';
 
-  const regions = schedules.filter((s) => s.country === country);
-  const mircTarget = Number(goals?.countriesMIRC?.[country]) || 0;
-  const mircPlanned = countryPlanned(goals, schedules, country, 'mirc');
-  const communityPlanned = countryPlanned(goals, schedules, country, 'community');
-  const pct = mircTarget ? Math.round((mircPlanned / mircTarget) * 100) : 0;
-  const state = mircTarget && mircPlanned > mircTarget ? 'over' : pct === 100 ? 'exact' : 'under';
+  const title = document.createElement('div');
+  title.className = 'wh-card-head';
+  title.innerHTML = '<span class="wh-card-title">Metas por región de venta</span>';
+  card.appendChild(title);
 
-  // Header: country + MIRC target + rollup
-  const head = document.createElement('div');
-  head.className = 'metas-country-head';
-  const title = document.createElement('span');
-  title.className = 'wh-card-title';
-  title.textContent = country;
-  head.appendChild(title);
-
-  const targetWrap = document.createElement('label');
-  targetWrap.className = 'metas-target';
-  targetWrap.innerHTML = '<span>Meta MIRC país (kg)</span>';
-  const targetInput = document.createElement('input');
-  targetInput.type = 'number';
-  targetInput.min = '0';
-  targetInput.step = '1000';
-  targetInput.value = mircTarget || '';
-  targetInput.placeholder = '0';
-  targetInput.setAttribute('aria-label', `Meta MIRC de ${country} en kg`);
-  targetInput.addEventListener('change', (e) => onCountryMirc(country, Math.max(0, Number(e.target.value) || 0)));
-  targetWrap.appendChild(targetInput);
-  head.appendChild(targetWrap);
-
-  const roll = document.createElement('span');
-  roll.className = 'metas-rollup';
-  roll.innerHTML = `MIRC plan <strong class="tally tally--${state}">${fmtKg(mircPlanned)}</strong>` +
-    (mircTarget ? ` / ${fmtKg(mircTarget)} · ${pct}%` : '');
-  head.appendChild(roll);
-
-  card.appendChild(head);
-
-  // Column header
   const heads = document.createElement('div');
   heads.className = 'metas-row metas-row--head';
   heads.innerHTML =
-    '<span>Región</span>' +
-    '<span>Community (kg)</span>' +
-    '<span>MIRC (kg)</span>' +
-    '<span>Total</span>' +
-    '<span>Salidas</span>';
+    '<span>Mercado</span><span>Community (kg)</span><span>MIRC (kg)</span><span>Total</span><span>Llegadas</span>';
   card.appendChild(heads);
 
-  regions.forEach((s) => {
+  let totCommunity = 0;
+  let totMirc = 0;
+  markets.forEach((mk) => {
+    totCommunity += marketGoal(goals, mk.slug, 'community');
+    totMirc += marketGoal(goals, mk.slug, 'mirc');
+
     const row = document.createElement('div');
     row.className = 'metas-row';
 
     const name = document.createElement('span');
     name.className = 'metas-region';
-    name.textContent = s.name;
+    name.textContent = mk.name;
     row.appendChild(name);
 
     ['community', 'mirc'].forEach((cat) => {
@@ -104,31 +72,84 @@ function countryCard(country, schedules, goals, shipments, leadLookup, onRegionG
       input.min = '0';
       input.step = '1000';
       input.className = 'metas-input';
-      input.value = regionGoal(goals, s.slug, cat) || '';
+      input.value = marketGoal(goals, mk.slug, cat) || '';
       input.placeholder = '0';
-      input.setAttribute('aria-label', `Meta ${cat} de ${s.name} en kg`);
-      input.addEventListener('change', (e) => onRegionGoal(s.slug, cat, Math.max(0, Number(e.target.value) || 0)));
+      input.setAttribute('aria-label', `Meta ${cat} de ${mk.name} en kg`);
+      input.addEventListener('change', (e) => onMarketGoal(mk.slug, cat, Math.max(0, Number(e.target.value) || 0)));
       row.appendChild(input);
     });
 
     const total = document.createElement('span');
     total.className = 'metas-total';
-    total.textContent = fmtKg(regionGoalTotal(goals, s.slug));
+    total.textContent = fmtKg(marketGoalTotal(goals, mk.slug));
     row.appendChild(total);
 
-    const alloc = regionShipmentSummary(shipments[s.slug], leadLookup).allocated;
+    const arr = marketShipmentArrivals(shipments, leadLookup, mk.slug).allocated;
+    const llegadas = document.createElement('span');
+    llegadas.className = 'metas-salidas';
+    llegadas.textContent = fmtKg(containersToKg(arr));
+    row.appendChild(llegadas);
+
+    card.appendChild(row);
+  });
+
+  const foot = document.createElement('p');
+  foot.className = 'metas-foot';
+  foot.innerHTML =
+    `Total <strong>Community ${fmtKg(totCommunity)}</strong> · ` +
+    `<strong>MIRC ${fmtKg(totMirc)}</strong> (demanda por mercado)`;
+  card.appendChild(foot);
+
+  return card;
+}
+
+/** Section 2: MIRC target per producing country. */
+function countryCard(schedules, goals, shipments, leadLookup, onCountryMirc) {
+  const card = document.createElement('section');
+  card.className = 'wh-card';
+
+  const title = document.createElement('div');
+  title.className = 'wh-card-head';
+  title.innerHTML = '<span class="wh-card-title">Meta MIRC por país productor</span>';
+  card.appendChild(title);
+
+  const heads = document.createElement('div');
+  heads.className = 'metas-row metas-row--head metas-row--country';
+  heads.innerHTML = '<span>País</span><span>Meta MIRC (kg)</span><span>Salidas</span>';
+  card.appendChild(heads);
+
+  listCountries(schedules).forEach((country) => {
+    const row = document.createElement('div');
+    row.className = 'metas-row metas-row--country';
+
+    const name = document.createElement('span');
+    name.className = 'metas-region';
+    name.textContent = country;
+    row.appendChild(name);
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.step = '1000';
+    input.className = 'metas-input';
+    input.value = (Number(goals?.countriesMIRC?.[country]) || 0) || '';
+    input.placeholder = '0';
+    input.setAttribute('aria-label', `Meta MIRC de ${country} en kg`);
+    input.addEventListener('change', (e) => onCountryMirc(country, Math.max(0, Number(e.target.value) || 0)));
+    row.appendChild(input);
+
     const salidas = document.createElement('span');
     salidas.className = 'metas-salidas';
-    salidas.textContent = fmtKg(containersToKg(alloc));
+    const cont = countrySalidas(shipments, schedules, country, leadLookup);
+    salidas.textContent = fmtKg(containersToKg(cont));
     row.appendChild(salidas);
 
     card.appendChild(row);
   });
 
-  // Community total (informational)
   const foot = document.createElement('p');
   foot.className = 'metas-foot';
-  foot.innerHTML = `Community plan (${country}): <strong>${fmtKg(communityPlanned)}</strong> · por demanda, sin meta de país.`;
+  foot.textContent = 'La meta de país es solo MIRC. Community va por demanda, sin meta de país.';
   card.appendChild(foot);
 
   return card;

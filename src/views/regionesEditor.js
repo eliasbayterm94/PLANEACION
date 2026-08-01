@@ -1,6 +1,6 @@
 import {
   MONTHS, monthName, primaryCampaign, CAMPAIGNS, CUTOFF_DAY,
-  shipmentArrival, regionShipmentSummary, containersToKg, kgToContainers,
+  shipmentArrival, regionShipmentSummary, containersToKg,
 } from '../model.js';
 
 /**
@@ -16,7 +16,7 @@ import {
  */
 export function renderRegionesEditor({
   schedules, selectedSlug, onSelect,
-  shipment, goal, allWarehouses, leadLookup,
+  shipment, allWarehouses, leadLookup,
   onShip, onAddWarehouse, onRemoveWarehouse,
 }) {
   const el = document.createElement('div');
@@ -43,7 +43,7 @@ export function renderRegionesEditor({
     allWarehouses,
   );
 
-  el.appendChild(header(schedule, cfg, leadLookup, goal));
+  el.appendChild(header(schedule, cfg, leadLookup));
 
   if (!added.length) {
     const empty = document.createElement('p');
@@ -58,25 +58,18 @@ export function renderRegionesEditor({
   return el;
 }
 
-function header(s, cfg, leadLookup, goal) {
+function header(s, cfg, leadLookup) {
   const wrap = document.createElement('div');
   wrap.className = 'view-head';
   const camp = primaryCampaign(s);
   const { allocated } = regionShipmentSummary(cfg, leadLookup);
   const allocKg = containersToKg(allocated);
-  const goalKg = (Number(goal?.community) || 0) + (Number(goal?.mirc) || 0);
-  const goalCont = kgToContainers(goalKg);
-  const pct = goalKg ? Math.round((allocKg / goalKg) * 100) : 0;
-  const metaNote = goalKg
-    ? `Meta <strong>${fmtKg(goalKg)}</strong> (${goalCont.toFixed(1)} cont) · ` +
-      `<strong class="tally tally--${allocKg > goalKg ? 'over' : pct === 100 ? 'exact' : 'under'}">${pct}%</strong> · `
-    : 'Sin meta (defínela en <strong>Metas</strong>) · ';
   wrap.innerHTML = `
     <h2>${s.name}</h2>
     <p class="view-sub">
-      ${CAMPAIGNS[camp]?.name ?? 'Sin campaña'} ·
+      ${s.country ? `${s.country} · ` : ''}${CAMPAIGNS[camp]?.name ?? 'Sin campaña'} ·
       Salidas <strong>${allocated}</strong> cont (${fmtKg(allocKg)}) ·
-      ${metaNote}
+      Metas en la pestaña <strong>Metas</strong> ·
       Cortes (ref.) el día ${CUTOFF_DAY}
     </p>`;
   return wrap;

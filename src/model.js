@@ -232,31 +232,37 @@ export const GOAL_CATEGORIES = [
   { key: 'mirc', name: 'MIRC' },
 ];
 
-/** Goals shape: { regions: { slug: { community, mirc } }, countriesMIRC: { country: kg } } */
-export const emptyGoals = () => ({ regions: {}, countriesMIRC: {} });
+/**
+ * Goals shape:
+ *   { markets: { marketSlug: { community, mirc } },  // by SALES region (demand)
+ *     countriesMIRC: { country: kg } }               // MIRC by PRODUCING country
+ * Community/MIRC targets live on the sales region (market); the MIRC country
+ * target lives on the producing country (region.country).
+ */
+export const emptyGoals = () => ({ markets: {}, countriesMIRC: {} });
 
-/** Distinct countries, in declaration order. */
+/** Distinct producing countries, in declaration order. */
 export function listCountries(regions = []) {
   const seen = [];
   regions.forEach((r) => { if (r.country && !seen.includes(r.country)) seen.push(r.country); });
   return seen;
 }
 
-/** kg for a region in one category. */
-export function regionGoal(goals, slug, category) {
-  return Number(goals?.regions?.[slug]?.[category]) || 0;
+/** kg goal for a sales region (market) in one category. */
+export function marketGoal(goals, marketSlug, category) {
+  return Number(goals?.markets?.[marketSlug]?.[category]) || 0;
 }
 
-/** Total kg goal (community + mirc) for a region. */
-export function regionGoalTotal(goals, slug) {
-  return regionGoal(goals, slug, 'community') + regionGoal(goals, slug, 'mirc');
+/** Total kg goal (community + mirc) for a sales region. */
+export function marketGoalTotal(goals, marketSlug) {
+  return marketGoal(goals, marketSlug, 'community') + marketGoal(goals, marketSlug, 'mirc');
 }
 
-/** Sum of a category's region goals for one country. */
-export function countryPlanned(goals, regions, country, category) {
+/** Containers shipped from a producing country's regions (all warehouses). */
+export function countrySalidas(shipments, regions, country, leadLookup) {
   return regions
     .filter((r) => r.country === country)
-    .reduce((sum, r) => sum + regionGoal(goals, r.slug, category), 0);
+    .reduce((sum, r) => sum + regionShipmentSummary(shipments[r.slug], leadLookup).allocated, 0);
 }
 
 // ---------------------------------------------------------------------------

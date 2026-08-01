@@ -92,15 +92,18 @@ are shown as reference markers only; the **Cosechas** Gantt is informational.
 
 ### Goals (Metas tab)
 
-Goals are kg targets, edited in the **Metas** tab, not inline with shipments.
-Two macro categories per region: **Community** and **MIRC**. MIRC additionally
-rolls up to a **country-level target** (`region.country`; today Colombia and
-Rwanda); Community is demand-driven and has no country target. Persisted as a
-single row, scope `goals`, slug `plan`:
-`{ regions: { slug: { community, mirc } }, countriesMIRC: { country: kg } }`.
-Salidas are not yet split by category, so progress shows total salidas (kg) vs a
-region's total goal, and the country card compares planned MIRC (sum of region
-MIRC goals) against the country target.
+Goals are kg targets, edited in the **Metas** tab, on **two different axes**:
+
+- **By sales region (market)** — Community + MIRC kg per market (USA, Europa,
+  MENA, AU). This is the demand plan. "Región" here means the *sales* region, not
+  the producing region.
+- **MIRC by producing country** — a country-level MIRC target (`region.country`;
+  today Colombia and Rwanda). Community has no country target (demand-driven).
+
+Persisted as a single row, scope `goals`, slug `plan`:
+`{ markets: { marketSlug: { community, mirc } }, countriesMIRC: { country: kg } }`.
+Salidas are not yet split by category, so the market card shows llegadas (kg) as
+context and the country card shows salidas (kg) from its producing regions.
 
 ---
 

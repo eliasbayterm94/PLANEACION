@@ -118,20 +118,21 @@ function saveGoalsState(value) {
   render();
 }
 
-function setRegionGoal(slug, category, kg) {
-  const g = {
-    regions: { ...(state.goals.regions || {}) },
+function goalsCopy() {
+  return {
+    markets: { ...(state.goals.markets || {}) },
     countriesMIRC: { ...(state.goals.countriesMIRC || {}) },
   };
-  g.regions[slug] = { ...(g.regions[slug] || {}), [category]: kg };
+}
+
+function setMarketGoal(marketSlug, category, kg) {
+  const g = goalsCopy();
+  g.markets[marketSlug] = { ...(g.markets[marketSlug] || {}), [category]: kg };
   saveGoalsState(g);
 }
 
 function setCountryMirc(country, kg) {
-  const g = {
-    regions: { ...(state.goals.regions || {}) },
-    countriesMIRC: { ...(state.goals.countriesMIRC || {}) },
-  };
+  const g = goalsCopy();
   g.countriesMIRC[country] = kg;
   saveGoalsState(g);
 }
@@ -194,11 +195,11 @@ function renderView() {
     }));
   } else if (kind === 'metas') {
     root.appendChild(renderMetas({
-      schedules,
+      schedules, markets,
       goals: state.goals,
       shipments: state.shipments,
       leadLookup,
-      onRegionGoal: (slug, category, kg) => setRegionGoal(slug, category, kg),
+      onMarketGoal: (slug, category, kg) => setMarketGoal(slug, category, kg),
       onCountryMirc: (country, kg) => setCountryMirc(country, kg),
     }));
   } else if (kind === 'cosechas') {
@@ -213,7 +214,6 @@ function renderView() {
       selectedSlug: slug,
       onSelect: (s) => { state.editRegion = s; render(); },
       shipment: state.shipments[slug] || { warehouses: [], ship: {} },
-      goal: state.goals.regions?.[slug] || {},
       allWarehouses,
       leadLookup,
       onShip: (wh, month, containers) => setShip(slug, wh, month, containers),
