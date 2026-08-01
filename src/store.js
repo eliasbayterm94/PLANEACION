@@ -19,6 +19,10 @@ const TABLE = 'plan_allocations';
 const LOCAL_KEY = `forest-plan-${YEAR}`;
 const SAVE_DEBOUNCE_MS = 600;
 
+// These scopes store a config/allocation OBJECT, not a numeric month map, so
+// they skip the numeric normalise step on load and realtime.
+const RAW_SCOPES = new Set(['warehouse', 'shipment']);
+
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -50,12 +54,11 @@ export async function loadPlan() {
     return { ...readLocal(), error: error.message };
   }
 
-  const plan = { region: {}, market: {}, warehouse: {} };
+  const plan = { region: {}, market: {}, warehouse: {}, shipment: {} };
   (data || []).forEach((row) => {
     if (!plan[row.scope]) plan[row.scope] = {};
-    // Warehouse rows hold a config object, not a numeric month map.
     plan[row.scope][row.slug] =
-      row.scope === 'warehouse' ? row.months : normalise(row.months);
+      RAW_SCOPES.has(row.scope) ? row.months : normalise(row.months);
   });
 
   writeLocal(plan); // keep an offline mirror
@@ -121,6 +124,14 @@ export function saveWarehouse(slug, config, onStatus = () => {}) {
   savePlanSlug('warehouse', slug, config, onStatus);
 }
 
+/**
+ * Persist a region's shipment allocation. One row per region, scope 'shipment';
+ * the value is { goals: { wh: kg }, ship: { wh: { monthIdx: containers } } }.
+ */
+export function saveShipment(regionSlug, value, onStatus = () => {}) {
+  savePlanSlug('shipment', regionSlug, value, onStatus);
+}
+
 // ---------------------------------------------------------------------------
 // Realtime — so the team sees each other's edits during a planning session
 // ---------------------------------------------------------------------------
@@ -135,7 +146,7 @@ export function subscribeToPlan(onChange) {
       (payload) => {
         const row = payload.new;
         if (!row) return;
-        const value = row.scope === 'warehouse' ? row.months : normalise(row.months);
+        const value = RAW_SCOPES.has(row.scope) ? row.months : normalise(row.months);
         onChange(row.scope, row.slug, value, row.updated_by);
       },
     )
@@ -155,9 +166,10 @@ function readLocal() {
       region: parsed.region || {},
       market: parsed.market || {},
       warehouse: parsed.warehouse || {},
+      shipment: parsed.shipment || {},
     };
   } catch {
-    return { region: {}, market: {}, warehouse: {} };
+    return { region: {}, market: {}, warehouse: {}, shipment: {} };
   }
 }
 

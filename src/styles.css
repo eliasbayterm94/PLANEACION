@@ -178,6 +178,72 @@
 }
 .region-pill:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 2px; }
 
+/* --- Region shipment editor (per-warehouse salidas) --------------------- */
+.wh-group { padding: 0; }
+.wh-group-inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 10px 16px;
+}
+.wh-group-name {
+  font-family: var(--fc-font-display);
+  font-size: var(--fc-fs-12);
+  font-weight: var(--fc-fw-bold);
+  letter-spacing: var(--fc-ls-loose);
+  text-transform: uppercase;
+  color: var(--fc-navy);
+}
+.wh-group-meta { font-family: var(--fc-font-body); font-size: 10.5px; color: var(--fc-ink-500); }
+.wh-goal { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.wh-goal span {
+  font-family: var(--fc-font-display);
+  font-size: 9px;
+  font-weight: var(--fc-fw-bold);
+  letter-spacing: var(--fc-ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--fc-ink-500);
+}
+.wh-goal input {
+  width: 96px;
+  font-family: var(--fc-font-mono);
+  font-size: var(--fc-fs-12);
+  color: var(--fc-navy);
+  background: #fff;
+  border: 1px solid var(--fc-ink-100);
+  border-radius: var(--fc-radius-2);
+  padding: 6px 8px;
+  text-align: right;
+}
+.wh-goal input:focus { outline: none; border-color: var(--fc-navy); }
+.wh-progress {
+  font-family: var(--fc-font-mono);
+  font-size: var(--fc-fs-11);
+  font-weight: var(--fc-fw-semibold);
+  color: var(--fc-ink-500);
+}
+.wh-remove--inline {
+  width: 28px; height: 28px;
+  border: none;
+  background: transparent;
+}
+.wh-remove--inline:hover { background: rgba(168,53,28,.08); }
+
+.wh-addbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: var(--fc-space-4); }
+.wh-select {
+  font-family: var(--fc-font-body);
+  font-size: var(--fc-fs-12);
+  color: var(--fc-navy);
+  background: #fff;
+  border: 1px solid var(--fc-ink-100);
+  border-radius: var(--fc-radius-2);
+  padding: 8px 12px;
+  min-width: 220px;
+  cursor: pointer;
+}
+.wh-select:focus { outline: none; border-color: var(--fc-navy); }
+
 /* --- Calendar grid ------------------------------------------------------ */
 .grid {
   display: grid;

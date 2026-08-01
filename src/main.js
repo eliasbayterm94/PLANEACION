@@ -1,9 +1,11 @@
 import { regions } from './data/regions.js';
 import { markets } from './data/markets.js';
 import { defaultWarehouses, emptyWarehouseConfig } from './data/warehouses.js';
-import { buildSchedules, CAMPAIGNS, YEAR } from './model.js';
 import {
-  loadPlan, savePlanSlug, saveWarehouse, subscribeToPlan, isRemote, editor, setEditor,
+  buildSchedules, CAMPAIGNS, YEAR, listWarehouses, warehouseLeadLookup,
+} from './model.js';
+import {
+  loadPlan, saveWarehouse, saveShipment, subscribeToPlan, isRemote, editor, setEditor,
 } from './store.js';
 import { renderMarket } from './views/market.js';
 import { renderConsolidado } from './views/consolidado.js';
@@ -17,8 +19,7 @@ const schedules = buildSchedules(regions);
 const state = {
   view: 'consolidado',
   editRegion: schedules[0]?.slug ?? null, // selected origin in the edit tab
-  regionQty: {},
-  marketQty: {},
+  shipments: {}, // { regionSlug: { goals: {wh: kg}, ship: {wh: {monthIdx: containers}} } }
   warehouses: {}, // { marketSlug: { primary, warehouses: [{name, lead}] } }
   status: '',
 };
@@ -68,15 +69,44 @@ function setStatus(kind, detail) {
   if (kind === 'saved') setTimeout(() => { el.textContent = ''; }, 1800);
 }
 
-function updateQty(scope, slug, month, value) {
-  const bucket = scope === 'region' ? state.regionQty : state.marketQty;
-  const months = { ...(bucket[slug] || {}) };
-  if (value > 0) months[month] = value;
-  else delete months[month];
-  bucket[slug] = months;
+// --- Shipment mutations (origin allocation, per region/warehouse) ----------
+function regionCopy(slug) {
+  const cur = state.shipments[slug] || { goals: {}, ship: {} };
+  return { goals: { ...(cur.goals || {}) }, ship: { ...(cur.ship || {}) } };
+}
 
-  savePlanSlug(scope, slug, months, setStatus);
+function saveRegion(slug, value) {
+  state.shipments[slug] = value;
+  saveShipment(slug, value, setStatus);
   render();
+}
+
+function setGoal(slug, wh, kg) {
+  const v = regionCopy(slug);
+  v.goals[wh] = kg;
+  saveRegion(slug, v);
+}
+
+function setShip(slug, wh, month, containers) {
+  const v = regionCopy(slug);
+  const months = { ...(v.ship[wh] || {}) };
+  if (containers > 0) months[month] = containers;
+  else delete months[month];
+  v.ship[wh] = months;
+  saveRegion(slug, v);
+}
+
+function addWarehouse(slug, wh) {
+  const v = regionCopy(slug);
+  if (v.goals[wh] == null && v.ship[wh] == null) v.goals[wh] = 0;
+  saveRegion(slug, v);
+}
+
+function removeWarehouse(slug, wh) {
+  const v = regionCopy(slug);
+  delete v.goals[wh];
+  delete v.ship[wh];
+  saveRegion(slug, v);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,33 +156,41 @@ function renderView() {
   root.innerHTML = '';
   const [kind, arg] = state.view.split(':');
 
+  const leadLookup = warehouseLeadLookup(state.warehouses);
+  const allWarehouses = listWarehouses(state.warehouses, markets);
+
   if (kind === 'consolidado') {
     root.appendChild(renderConsolidado({
       schedules, markets,
-      regionQty: state.regionQty,
-      marketQty: state.marketQty,
-      warehouses: state.warehouses,
+      shipments: state.shipments,
+      leadLookup,
     }));
   } else if (kind === 'cosechas') {
     root.appendChild(renderCosechas({
       schedules,
-      regionQty: state.regionQty,
+      shipments: state.shipments,
     }));
   } else if (kind === 'regiones') {
+    const slug = state.editRegion;
     root.appendChild(renderRegionesEditor({
       schedules,
-      selectedSlug: state.editRegion,
-      onSelect: (slug) => { state.editRegion = slug; render(); },
-      qty: state.regionQty[state.editRegion] || {},
-      onQty: (month, value) => updateQty('region', state.editRegion, month, value),
+      selectedSlug: slug,
+      onSelect: (s) => { state.editRegion = s; render(); },
+      shipment: state.shipments[slug] || { goals: {}, ship: {} },
+      allWarehouses,
+      leadLookup,
+      onGoal: (wh, kg) => setGoal(slug, wh, kg),
+      onShip: (wh, month, containers) => setShip(slug, wh, month, containers),
+      onAddWarehouse: (wh) => addWarehouse(slug, wh),
+      onRemoveWarehouse: (wh) => removeWarehouse(slug, wh),
     }));
   } else if (kind === 'market') {
     const market = markets.find((m) => m.slug === arg);
     root.appendChild(renderMarket({
       market,
-      qty: state.marketQty[arg] || {},
-      onQty: (month, value) => updateQty('market', arg, month, value),
       warehouses: state.warehouses[arg],
+      shipments: state.shipments,
+      leadLookup,
     }));
   } else if (kind === 'bodegas') {
     root.appendChild(renderBodegas({
@@ -208,18 +246,17 @@ async function init() {
   const fromHash = location.hash.slice(1);
   if (fromHash && TABS.some((t) => t.id === fromHash)) state.view = fromHash;
 
-  const { region, market, warehouse, error } = await loadPlan();
-  state.regionQty = region;
-  state.marketQty = market;
+  const { warehouse, shipment, error } = await loadPlan();
   state.warehouses = buildWarehouses(warehouse);
+  state.shipments = shipment || {};
   if (error) setStatus('error', error);
 
   render();
 
   subscribeToPlan((scope, slug, value) => {
     if (scope === 'warehouse') state.warehouses[slug] = value;
-    else if (scope === 'region') state.regionQty[slug] = value;
-    else state.marketQty[slug] = value;
+    else if (scope === 'shipment') state.shipments[slug] = value;
+    else return; // legacy region/market scopes are no longer rendered
     render();
   });
 }

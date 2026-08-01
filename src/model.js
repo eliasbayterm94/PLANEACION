@@ -10,6 +10,10 @@
 
 export const YEAR = 2027;
 
+/** Conversion factor: one container of green coffee = this many kilograms.
+ *  Goals are set in kg; allocations are captured in containers. */
+export const KG_PER_CONTAINER = 17500;
+
 export const MONTHS = [
   'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
   'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
@@ -132,6 +136,92 @@ export function marketArrivalDelay(market, cfg) {
   if (lead != null) return Math.max(0, Math.round(lead) - OFFSETS.despachoToEntrega);
   return market.arrivalDelay || 0;
 }
+
+// ---------------------------------------------------------------------------
+// Shipments — warehouse-level allocation (the real salidas/llegadas plan)
+// ---------------------------------------------------------------------------
+/**
+ * Shipments are captured on the ORIGIN side, per region, per warehouse, per
+ * month (containers). Arrival is derived from the warehouse lead time, so both
+ * the departure (salida) and the landing (llegada) are visible. This is
+ * independent of the derived cosecha calendar, which stays informational.
+ *
+ * Per-region shape:  { goals: { whName: kg }, ship: { whName: { monthIdx: containers } } }
+ */
+
+/** name -> { lead, market } across every market's warehouses. */
+export function warehouseLeadLookup(warehousesByMarket = {}) {
+  const map = {};
+  Object.entries(warehousesByMarket).forEach(([market, cfg]) => {
+    (cfg?.warehouses || []).forEach((w) => {
+      map[w.name] = { lead: Number(w.lead) || 0, market };
+    });
+  });
+  return map;
+}
+
+/** Flat list of every warehouse with its market, for pickers. */
+export function listWarehouses(warehousesByMarket = {}, markets = []) {
+  const out = [];
+  markets.forEach((m) => {
+    (warehousesByMarket[m.slug]?.warehouses || []).forEach((w) => {
+      out.push({ market: m.slug, marketName: m.name, name: w.name, lead: Number(w.lead) || 0 });
+    });
+  });
+  return out;
+}
+
+/** Landing month for a departure, using the (rounded) warehouse lead. */
+export const shipmentArrival = (month, lead) => mod12(Number(month) + Math.round(Number(lead) || 0));
+
+/** Salidas / llegadas by month + total containers for one region's shipments. */
+export function regionShipmentSummary(regionShip, leadLookup = {}) {
+  const salidas = new Array(12).fill(0);
+  const llegadas = new Array(12).fill(0);
+  let allocated = 0;
+  const ship = regionShip?.ship || {};
+  Object.entries(ship).forEach(([wh, months]) => {
+    const lead = leadLookup[wh]?.lead ?? OFFSETS.despachoToEntrega;
+    Object.entries(months || {}).forEach(([m, n]) => {
+      const c = Number(n) || 0;
+      if (!c) return;
+      salidas[mod12(Number(m))] += c;
+      llegadas[shipmentArrival(m, lead)] += c;
+      allocated += c;
+    });
+  });
+  return { salidas, llegadas, allocated };
+}
+
+/** Containers allocated by one region to one warehouse. */
+export function warehouseAllocated(regionShip, whName) {
+  const months = regionShip?.ship?.[whName] || {};
+  return Object.values(months).reduce((a, b) => a + (Number(b) || 0), 0);
+}
+
+/** Arrivals by month + total containers landing in a market, from ALL regions'
+ *  shipments to that market's warehouses. */
+export function marketShipmentArrivals(shipmentsByRegion = {}, leadLookup = {}, marketSlug) {
+  const llegadas = new Array(12).fill(0);
+  let allocated = 0;
+  Object.values(shipmentsByRegion).forEach((rs) => {
+    Object.entries(rs?.ship || {}).forEach(([wh, months]) => {
+      const info = leadLookup[wh];
+      if (!info || info.market !== marketSlug) return;
+      Object.entries(months || {}).forEach(([m, n]) => {
+        const c = Number(n) || 0;
+        if (!c) return;
+        llegadas[shipmentArrival(m, info.lead)] += c;
+        allocated += c;
+      });
+    });
+  });
+  return { llegadas, allocated };
+}
+
+/** kg <-> container helpers. */
+export const containersToKg = (c) => (Number(c) || 0) * KG_PER_CONTAINER;
+export const kgToContainers = (kg) => (Number(kg) || 0) / KG_PER_CONTAINER;
 
 // ---------------------------------------------------------------------------
 // Market chains

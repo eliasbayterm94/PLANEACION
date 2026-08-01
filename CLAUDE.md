@@ -68,15 +68,27 @@ of the model rather than being chosen — confirm it matches reality, or make
 
 ## Where containers are entered
 
-| Side | Row | Meaning |
-|---|---|---|
-| Origin (region view) | **Despacho** | containers leaving that origin that month |
-| Destination (market view) | **Corte** | containers committed against that cutoff |
+Allocation is **origin-driven and warehouse-aware**. In **Editar regiones** you
+pick a region, add the warehouses it ships to, and enter containers per warehouse
+per month (the **salida**). Each region+warehouse carries a **goal in kg**
+(`KG_PER_CONTAINER = 17500` in `model.js` converts containers ⇄ kg).
 
-Delivery and arrival rows are **derived and read-only**. The consolidated view
-compares the two sides and shows the monthly delta. A non-zero delta means
-origin and destination disagree — that is the whole point of the view, so never
-"fix" it by hiding it.
+Everything else is **derived** from those shipments:
+
+- **Llegada** (arrival) = salida month + `round(warehouse.lead)` — visible right
+  under the salida row.
+- **Destino / market view** is read-only: it aggregates every region's shipments
+  to that market's warehouses into arrivals, shown against the market target.
+  There is no manual "Corte" capture anymore.
+- **Consolidado** shows salidas by region and llegadas by market — both from the
+  same shipment data — plus allocated-vs-target. (No more supply/demand delta:
+  there is a single source now.)
+
+Persisted per region as scope `shipment`, one row each:
+`{ goals: { whName: kg }, ship: { whName: { monthIdx: containers } } }`.
+
+Shipments are **independent of the cosecha calendar**. The derived cutoff months
+are shown as reference markers only; the **Cosechas** Gantt is informational.
 
 ---
 

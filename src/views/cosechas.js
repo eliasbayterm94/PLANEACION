@@ -17,7 +17,7 @@ const PHASES = [
   { key: 'entrega', name: 'Entrega', icon: 'package-check' },
 ];
 
-export function renderCosechas({ schedules, regionQty }) {
+export function renderCosechas({ schedules, shipments }) {
   const el = document.createElement('div');
   el.appendChild(header());
   el.appendChild(legend());
@@ -42,7 +42,7 @@ export function renderCosechas({ schedules, regionQty }) {
     .sort((a, b) => (primaryCampaign(a) || 9) - (primaryCampaign(b) || 9))
     .forEach((s) => {
       const camp = primaryCampaign(s);
-      const q = regionQty[s.slug] || {};
+      const ship = shipments[s.slug]?.ship || {};
 
       const label = document.createElement('div');
       label.className = 'row-label';
@@ -74,7 +74,10 @@ export function renderCosechas({ schedules, regionQty }) {
         g.appendChild(cell);
       }
 
-      const total = Object.values(q).reduce((a, b) => a + (Number(b) || 0), 0);
+      const total = Object.values(ship).reduce(
+        (sum, months) => sum + Object.values(months || {}).reduce((a, b) => a + (Number(b) || 0), 0),
+        0,
+      );
       const totalCell = document.createElement('div');
       totalCell.className = 'cell gantt-total';
       totalCell.textContent = total > 0 ? total : '—';
@@ -94,8 +97,8 @@ function header() {
     <p class="view-sub">
       Gantt de todas las regiones en una vista. Cada banda va de cosecha a
       entrega; los íconos marcan la fase de cada mes y el punto indica la
-      campaña. El total son los contenedores despachados capturados.
-      Para editar, usa la pestaña <strong>Editar regiones</strong>.
+      campaña. El total son los contenedores de salida asignados.
+      Para editar salidas, usa la pestaña <strong>Editar regiones</strong>.
       Los cortes son siempre el día ${CUTOFF_DAY}.
     </p>`;
   return wrap;
