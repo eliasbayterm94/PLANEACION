@@ -21,10 +21,11 @@ const SAVE_DEBOUNCE_MS = 600;
 
 // These scopes store a config/allocation OBJECT, not a numeric month map, so
 // they skip the numeric normalise step on load and realtime.
-const RAW_SCOPES = new Set(['warehouse', 'shipment', 'goals']);
+const RAW_SCOPES = new Set(['warehouse', 'shipment', 'goals', 'alloc']);
 
-/** The goals scope is a single row for the whole plan. */
+/** Single-row scopes for the whole plan. */
 export const GOALS_SLUG = 'plan';
+export const ALLOC_SLUG = 'plan';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -57,7 +58,7 @@ export async function loadPlan() {
     return { ...readLocal(), error: error.message };
   }
 
-  const plan = { region: {}, market: {}, warehouse: {}, shipment: {}, goals: {} };
+  const plan = { region: {}, market: {}, warehouse: {}, shipment: {}, goals: {}, alloc: {} };
   (data || []).forEach((row) => {
     if (!plan[row.scope]) plan[row.scope] = {};
     plan[row.scope][row.slug] =
@@ -143,6 +144,11 @@ export function saveGoals(value, onStatus = () => {}) {
   savePlanSlug('goals', GOALS_SLUG, value, onStatus);
 }
 
+/** Persist product allocation (Base/Libre/Asegurado per product per market). */
+export function saveAlloc(value, onStatus = () => {}) {
+  savePlanSlug('alloc', ALLOC_SLUG, value, onStatus);
+}
+
 // ---------------------------------------------------------------------------
 // Realtime — so the team sees each other's edits during a planning session
 // ---------------------------------------------------------------------------
@@ -179,9 +185,10 @@ function readLocal() {
       warehouse: parsed.warehouse || {},
       shipment: parsed.shipment || {},
       goals: parsed.goals || {},
+      alloc: parsed.alloc || {},
     };
   } catch {
-    return { region: {}, market: {}, warehouse: {}, shipment: {}, goals: {} };
+    return { region: {}, market: {}, warehouse: {}, shipment: {}, goals: {}, alloc: {} };
   }
 }
 

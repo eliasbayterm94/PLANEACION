@@ -5,7 +5,7 @@ import {
   buildSchedules, CAMPAIGNS, YEAR, warehouseLeadLookup, emptyGoals,
 } from './model.js';
 import {
-  loadPlan, saveWarehouse, saveShipment, saveGoals, GOALS_SLUG,
+  loadPlan, saveWarehouse, saveShipment, saveGoals, saveAlloc, GOALS_SLUG, ALLOC_SLUG,
   subscribeToPlan, isRemote, editor, setEditor,
 } from './store.js';
 import { renderMarket } from './views/market.js';
@@ -24,6 +24,7 @@ const state = {
   shipments: {}, // { country: { ship: { wh: { monthIdx: containers } } } }
   warehouses: {}, // { marketSlug: { primary, warehouses: [{name, lead}] } }
   goals: emptyGoals(), // { markets, warehouses, countriesMIRC }
+  alloc: {}, // { productKey: { marketSlug: { base, libre, asegurado } } }
   status: '',
 };
 
@@ -118,6 +119,45 @@ function setCountryMirc(country, kg) {
   const g = goalsCopy();
   g.countriesMIRC[country] = kg;
   saveGoalsState(g);
+}
+
+// --- Product allocation mutations (Base/Libre/Asegurado per product/market) --
+function saveAllocState(value) {
+  state.alloc = value;
+  saveAlloc(value, setStatus);
+  render();
+}
+
+function allocCopy(key) {
+  const cur = state.alloc[key] || {};
+  const out = {};
+  Object.entries(cur).forEach(([mk, v]) => { out[mk] = { ...v }; });
+  return out;
+}
+
+function setAlloc(key, market, field, kg) {
+  const a = { ...state.alloc };
+  const forKey = allocCopy(key);
+  forKey[market] = { base: 0, libre: 0, asegurado: 0, ...(forKey[market] || {}), [field]: kg };
+  a[key] = forKey;
+  saveAllocState(a);
+}
+
+function addAllocRegion(key, market) {
+  const a = { ...state.alloc };
+  const forKey = allocCopy(key);
+  if (!forKey[market]) forKey[market] = { base: 0, libre: 0, asegurado: 0 };
+  a[key] = forKey;
+  saveAllocState(a);
+}
+
+function removeAllocRegion(key, market) {
+  const a = { ...state.alloc };
+  const forKey = allocCopy(key);
+  delete forKey[market];
+  if (Object.keys(forKey).length) a[key] = forKey;
+  else delete a[key];
+  saveAllocState(a);
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +258,16 @@ function renderView() {
       },
     }));
   } else if (kind === 'products') {
-    root.appendChild(renderProducts({ campaign: Number(arg) }));
+    root.appendChild(renderProducts({
+      campaign: Number(arg),
+      markets,
+      warehouses: state.warehouses,
+      goals: state.goals,
+      alloc: state.alloc,
+      onAlloc: (key, market, field, kg) => setAlloc(key, market, field, kg),
+      onAddRegion: (key, market) => addAllocRegion(key, market),
+      onRemoveRegion: (key, market) => removeAllocRegion(key, market),
+    }));
   }
 }
 
@@ -261,10 +310,11 @@ async function init() {
   const fromHash = location.hash.slice(1);
   if (fromHash && TABS.some((t) => t.id === fromHash)) state.view = fromHash;
 
-  const { warehouse, shipment, goals, error } = await loadPlan();
+  const { warehouse, shipment, goals, alloc, error } = await loadPlan();
   state.warehouses = buildWarehouses(warehouse);
   state.shipments = shipment || {};
   state.goals = goals?.[GOALS_SLUG] || emptyGoals();
+  state.alloc = alloc?.[ALLOC_SLUG] || {};
   if (error) setStatus('error', error);
 
   render();
@@ -273,6 +323,7 @@ async function init() {
     if (scope === 'warehouse') state.warehouses[slug] = value;
     else if (scope === 'shipment') state.shipments[slug] = value;
     else if (scope === 'goals') state.goals = value;
+    else if (scope === 'alloc') state.alloc = value;
     else return; // legacy region/market scopes are no longer rendered
     render();
   });

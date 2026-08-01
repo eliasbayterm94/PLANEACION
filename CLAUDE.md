@@ -106,6 +106,18 @@ Persisted as a single row, scope `goals`, slug `plan`:
 Salidas are not yet split by category, so the market card shows llegadas (kg) as
 context and the country card shows salidas (kg) from its producing regions.
 
+### Product allocation (Campaña tabs)
+
+The **Campaña 1 / 2** tabs (`products.js`) carry the commitment layer, per
+product × **sales region** (market), in kg: **Base** (reserved) + **Libre**
+(available); **Asegurado** (secured sales) commits Libre first, so
+`libreDisp = libre − asegurado` (negative = oversold). A rollup per market
+(Base / Asegurado / Libre) shows coverage vs the market's kg goal. Persisted as a
+single row, scope `alloc`, slug `plan`:
+`{ [productKey]: { [marketSlug]: { base, libre, asegurado } } }` where
+`productKey = ${cutoffMonth}::${name}`. Asegurado is manual today; wiring it to
+HubSpot deals (backlog 4) is the next step.
+
 ---
 
 ## Architecture
@@ -126,7 +138,7 @@ src/
     cosechas.js      read-only Gantt of every origin at once ("Cosechas" tab)
     market.js        per-market arrivals (derived, read-only)
     bodegas.js       edit warehouses + lead times per destination ("Bodegas" tab)
-    products.js      releases per cutoff
+    products.js      releases per cutoff + Base/Libre/Asegurado allocation
   main.js            router, tabs, state
   forest-design-system.css  Forest Design System v1.0 (shell, tokens)
   styles.css         planning calendar + cards on the Forest light theme

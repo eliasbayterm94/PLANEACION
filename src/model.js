@@ -296,6 +296,36 @@ export function exportCapacity(schedules, country) {
 }
 
 // ---------------------------------------------------------------------------
+// Product allocation — Base / Libre / Asegurado per product per sales region
+// ---------------------------------------------------------------------------
+// alloc shape: { [productKey]: { [marketSlug]: { base, libre, asegurado } } } (kg)
+// Base = reserved baseline, Libre = available to sell, Asegurado (secured sales)
+// commits Libre first. productKey is unique per (cutoff, product name).
+
+export const productKey = (cutoffMonth, name) => `${cutoffMonth}::${name}`;
+
+/** One product+region allocation, with derived free-available. */
+export function allocCell(alloc, key, market) {
+  const a = alloc?.[key]?.[market] || {};
+  const base = Number(a.base) || 0;
+  const libre = Number(a.libre) || 0;
+  const asegurado = Number(a.asegurado) || 0;
+  return { base, libre, asegurado, libreDisp: libre - asegurado, total: base + libre };
+}
+
+/** Roll up a set of product keys for one market. */
+export function allocMarketRollup(alloc, keys, market) {
+  const acc = { base: 0, libre: 0, asegurado: 0 };
+  keys.forEach((k) => {
+    const c = allocCell(alloc, k, market);
+    acc.base += c.base; acc.libre += c.libre; acc.asegurado += c.asegurado;
+  });
+  acc.total = acc.base + acc.libre;
+  acc.libreDisp = acc.libre - acc.asegurado;
+  return acc;
+}
+
+// ---------------------------------------------------------------------------
 // Goals — kg targets by category, and the country-level MIRC target
 // ---------------------------------------------------------------------------
 /** The two macro categories every region goal is split into. */
