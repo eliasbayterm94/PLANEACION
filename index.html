@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plan 2027 — Forest Coffee</title>
+
+  <!-- Forest brand fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Montserrat:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Forest design system + app overrides -->
+  <link rel="stylesheet" href="/src/forest-design-system.css" />
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body class="fc-body fc-reset">
+  <div class="fc-app">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fc-sidebar" aria-label="Navegación del plan">
+      <div class="fc-sidebar-header">
+        <button id="brand" class="fc-sidebar-brand" type="button" title="Colapsar menú">
+          <span class="fc-sidebar-logo">P27</span>
+          <span class="fc-sidebar-title">Plan <span id="year">2027</span></span>
+        </button>
+      </div>
+
+      <nav id="sidebar-nav" class="fc-sidebar-nav" aria-label="Vistas del plan"></nav>
+
+      <div class="fc-sidebar-footer">
+        <label class="fp-editor-field">
+          <span class="fp-editor-label">Editando como</span>
+          <input id="editor" type="text" placeholder="Tu nombre" autocomplete="name" />
+        </label>
+        <span id="mode" class="fp-mode"></span>
+        <button id="collapse" class="fc-sidebar-toggle-footer" type="button">
+          <svg class="fc-ico-collapse" width="16" height="16" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          <span class="label">Colapsar</span>
+        </button>
+      </div>
+    </aside>
+    <div id="backdrop" class="fc-sidebar-backdrop"></div>
+
+    <!-- Main -->
+    <div class="fc-app-main">
+      <div class="fc-topbar">
+        <div class="fp-topbar-left">
+          <button id="hamburger" class="fc-mobile-toggle" type="button" aria-label="Abrir menú">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <span id="page-title" class="fc-topbar-page-title">Consolidado</span>
+        </div>
+        <div class="fp-topbar-right">
+          <span id="status" class="fp-status"></span>
+        </div>
+      </div>
+
+      <main id="view" class="fc-content"></main>
+
+      <footer class="fp-footer">
+        <p class="fc-caption">
+          Cada mes de cosecha abre su propia ola: corte un mes después, despacho un mes más,
+          llegada un mes más (dos para Rwanda, y un mes extra para MENA y AU).
+          Las muestras salen un mes antes de cada corte. Los cortes son siempre el día 15.
+        </p>
+        <p class="fc-caption">
+          Los contenedores se capturan en <strong>Despacho</strong> del lado de origen
+          y en <strong>Corte</strong> del lado de destino. El consolidado compara ambos
+          y marca el descuadre.
+        </p>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Lucide icons (brand rule 1: no emojis, use Lucide) -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

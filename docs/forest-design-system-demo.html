@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Forest Design System — Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Montserrat:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="forest-design-system.css">
+<style>
+  body{padding:32px 48px;background:var(--fc-cream);}
+  .demo-section{margin-bottom:48px;}
+  .demo-section h3{
+    font-family:var(--fc-font-display);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.32em;
+    text-transform:uppercase;
+    color:var(--fc-ink-500);
+    margin-bottom:16px;
+  }
+  .swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+  .swatch{
+    aspect-ratio:1;
+    border-radius:8px;
+    display:flex;align-items:flex-end;
+    padding:10px;
+    font-family:var(--fc-font-mono);
+    font-size:10px;
+    color:#fff;
+  }
+</style>
+</head>
+<body class="fc-reset">
+
+  <div class="demo-section">
+    <h3>Paleta</h3>
+    <div class="swatches">
+      <div class="swatch" style="background:var(--fc-yellow);color:var(--fc-navy);">#e7e244</div>
+      <div class="swatch" style="background:var(--fc-blue);color:var(--fc-navy);">#95b5ce</div>
+      <div class="swatch" style="background:var(--fc-navy);">#1b203d</div>
+      <div class="swatch" style="background:var(--fc-ink);">#0c0c0b</div>
+      <div class="swatch" style="background:var(--fc-teal);color:var(--fc-navy);">#7dd3c4</div>
+    </div>
+  </div>
+
+  <div class="demo-section">
+    <h3>Hero card · featured (KC pattern)</h3>
+    <div class="fc-hero-row">
+      <div class="fc-hero-card featured">
+        <div class="fc-hero-label" style="font-family:var(--fc-font-display);font-weight:700;font-size:10px;letter-spacing:0.32em;text-transform:uppercase;color:var(--fc-on-navy-3);margin-bottom:10px;">Hedge Global · headline</div>
+        <div class="fc-hero-big">60.5%</div>
+        <div class="fc-hero-unit" style="font-size:13px;color:var(--fc-on-navy-2);margin-top:8px;margin-bottom:14px;">de la cobertura objetivo</div>
+        <div class="fc-bar-track"><div class="fc-bar-fill" style="width:60.5%"></div></div>
+        <div class="fc-hero-pills">
+          <span class="fc-pill">3,867 cubiertos</span>
+          <span class="fc-pill">15.91 lotes</span>
+        </div>
+      </div>
+      <div class="fc-hero-card alert-side is-crit">
+        <div class="fc-hero-label">Sacos sin hedge</div>
+        <div class="fc-hero-big-alt">816</div>
+        <div style="font-size:12px;color:var(--fc-ink-500);">exposición sin cubrir</div>
+        <button class="fc-btn-cta" style="margin-top:auto;align-self:flex-start;">VER DETALLE →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-section">
+    <h3>P&L Strip</h3>
+    <div class="fc-pnl-strip">
+      <div class="fc-pnl-cell">
+        <div class="fc-pnl-cell-label">P&L Hedge</div>
+        <div class="fc-pnl-cell-value neg">-$15,217</div>
+        <div class="fc-pnl-cell-sub">cierres físicos</div>
+      </div>
+      <div class="fc-pnl-cell">
+        <div class="fc-pnl-cell-label">Premium</div>
+        <div class="fc-pnl-cell-value pos">+$7,106</div>
+        <div class="fc-pnl-cell-sub">18 abiertas</div>
+      </div>
+      <div class="fc-pnl-cell featured">
+        <div class="fc-pnl-cell-label">P&L Neto Total</div>
+        <div class="fc-pnl-cell-value">+$17,547</div>
+        <div class="fc-pnl-cell-sub">conclusión</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-section">
+    <h3>Alertas</h3>
+    <button class="fc-alert critical">
+      <div class="fc-alert-ico">!</div>
+      <div class="fc-alert-body">
+        <div class="fc-alert-title"><span class="fc-alert-num">816</span> sacos sin hedge</div>
+        <div class="fc-alert-sub">Cobertura 60.5% · acción requerida</div>
+      </div>
+      <div class="fc-alert-arrow">›</div>
+    </button>
+    <div style="margin-top:8px;"></div>
+    <button class="fc-alert ok">
+      <div class="fc-alert-ico">✓</div>
+      <div class="fc-alert-body">
+        <div class="fc-alert-title">Forwards al día</div>
+        <div class="fc-alert-sub">Sin vencimientos próximos</div>
+      </div>
+      <div class="fc-alert-arrow">›</div>
+    </button>
+  </div>
+
+  <div class="demo-section">
+    <h3>Botones</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="fc-btn fc-btn-primary">Primary action</button>
+      <button class="fc-btn fc-btn-navy">Navy action</button>
+      <button class="fc-btn fc-btn-ghost">Ghost</button>
+      <button class="fc-btn-cta">VER DETALLE →</button>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,207 @@
+/**
+ * model.js — Single source of truth for the 2027 planning model.
+ *
+ * RULE: no view, no data file, and no component may hardcode a phase month.
+ * Regions declare ONLY their harvest months (+ optional transit override).
+ * Everything downstream — cutoff, shipping, delivery, samples, campaign —
+ * is derived here. This is what prevented the five schedule inconsistencies
+ * that existed in the original single-file prototype.
+ */
+
+export const YEAR = 2027;
+
+export const MONTHS = [
+  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+];
+
+// ---------------------------------------------------------------------------
+// Offsets, in months. Change these and the whole calendar recalculates.
+// ---------------------------------------------------------------------------
+export const OFFSETS = {
+  cosechaToCorte: 1,     // harvest month -> commercial cutoff
+  corteToDespacho: 1,    // cutoff -> vessel departure
+  despachoToEntrega: 1,  // default ocean transit; per-region override via `transitMonths`
+  corteToMuestra: -1,    // type samples land 1 month BEFORE the cutoff
+};
+
+/** Cutoffs always fall on the 15th. */
+export const CUTOFF_DAY = 15;
+
+/**
+ * Campaign windows, defined by CUTOFF month — not by region.
+ * A region can feed the tail of one campaign and the body of the next
+ * (Huila Sur does exactly this), so campaign is a property of the cutoff.
+ *
+ * NOTE FOR ELIAS: confirm this naming. Campaign 1 = main crop (Oct-Ene
+ * cutoffs), Campaign 2 = mitaca/traviesa (Jun-Sep cutoffs). The original
+ * prototype's footer used this convention; its `regions` array used the
+ * inverse. Flip `cutoffMonths` below if the intended meaning is reversed.
+ */
+// Colours follow the Forest design system closed palette (design system rule 6):
+// Campaña 1 (main crop) = brand yellow, Campaña 2 (mitaca) = brand blue.
+export const CAMPAIGNS = {
+  1: { name: 'Campaña 1', cutoffMonths: [9, 10, 11, 0], color: '#e7e244' },
+  2: { name: 'Campaña 2', cutoffMonths: [5, 6, 7, 8], color: '#95b5ce' },
+};
+
+/** Months in which nothing lands anywhere. Complement of the delivery calendar. */
+export const NO_ARRIVAL_MONTHS = [3, 4, 5, 6]; // Abr, May, Jun, Jul
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+export const mod12 = (n) => ((n % 12) + 12) % 12;
+export const shift = (months, by) => months.map((m) => mod12(m + by));
+export const monthName = (i) => MONTHS[mod12(i)];
+export const monthList = (arr) => (arr && arr.length ? arr.map(monthName).join(', ') : '—');
+
+/** Total months from cutoff to landing, for a given transit. */
+export const corteToEntrega = (transit = OFFSETS.despachoToEntrega) =>
+  OFFSETS.corteToDespacho + transit;
+
+// ---------------------------------------------------------------------------
+// Region schedule derivation
+// ---------------------------------------------------------------------------
+/**
+ * Build a full schedule from a region's harvest declaration.
+ *
+ * region.corteMode:
+ *   'wave'   (default) — each harvest month produces its own cutoff wave
+ *   'single'           — one cutoff after the whole harvest closes (Rwanda)
+ */
+export function buildSchedule(region) {
+  const transit = region.transitMonths ?? OFFSETS.despachoToEntrega;
+  const mode = region.corteMode ?? 'wave';
+
+  const corte =
+    mode === 'single'
+      ? [mod12(region.cosecha[region.cosecha.length - 1] + OFFSETS.cosechaToCorte)]
+      : shift(region.cosecha, OFFSETS.cosechaToCorte);
+
+  const despacho = shift(corte, OFFSETS.corteToDespacho);
+  const entrega = shift(despacho, transit);
+  const muestra = shift(corte, OFFSETS.corteToMuestra);
+
+  return { ...region, corte, despacho, entrega, muestra, transitMonths: transit, corteMode: mode };
+}
+
+export function buildSchedules(regions) {
+  return regions.map(buildSchedule);
+}
+
+/** Which campaign a given cutoff month belongs to. */
+export function campaignOfMonth(m) {
+  const hit = Object.entries(CAMPAIGNS).find(([, c]) => c.cutoffMonths.includes(mod12(m)));
+  return hit ? Number(hit[0]) : null;
+}
+
+/** A region's dominant campaign — for grouping and colour only, never for logic. */
+export function primaryCampaign(schedule) {
+  const counts = {};
+  schedule.corte.forEach((m) => {
+    const c = campaignOfMonth(m);
+    if (c) counts[c] = (counts[c] || 0) + 1;
+  });
+  const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  return ranked.length ? Number(ranked[0][0]) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Market chains
+// ---------------------------------------------------------------------------
+/**
+ * For a market, build the chain of cutoff -> landing.
+ *
+ * `arrivalDelay` (extra transit for MENA / AU) is applied to BOTH the landing
+ * month and the label shown on the cutoff cell. In the original prototype it
+ * was applied only to the arrivals row, so MENA and AU cutoff cells advertised
+ * a landing month one month earlier than reality.
+ */
+export function marketChains(market) {
+  const delay = market.arrivalDelay || 0;
+  const lead = corteToEntrega();
+  const chains = [];
+
+  for (let base = 0; base < 12; base++) {
+    if (NO_ARRIVAL_MONTHS.includes(base)) continue;
+    const corteMonth = mod12(base - lead);
+    chains.push({
+      corteMonth,
+      muestraMonth: mod12(corteMonth + OFFSETS.corteToMuestra),
+      despachoMonth: mod12(corteMonth + OFFSETS.corteToDespacho),
+      arrivalMonth: mod12(base + delay),
+      campaign: campaignOfMonth(corteMonth),
+    });
+  }
+  return chains;
+}
+
+/** Index a market's chains by the month the cutoff happens. */
+export function chainsByCorte(market) {
+  const map = {};
+  marketChains(market).forEach((c) => { map[c.corteMonth] = c; });
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// Reconciliation — supply (origin) vs demand (destination)
+// ---------------------------------------------------------------------------
+/**
+ * The control that did not exist before: region shipments and market arrivals
+ * were two independent number sets that could silently diverge.
+ *
+ * @param schedules  derived region schedules
+ * @param regionQty  { slug: { monthIndex: containers } }  entered on the shipping row
+ * @param markets    market definitions
+ * @param marketQty  { slug: { monthIndex: containers } }  entered on the cutoff row
+ * @returns { byMonth: [{ month, supply, demand, delta }], totals }
+ */
+export function reconcile(schedules, regionQty, markets, marketQty) {
+  const supply = new Array(12).fill(0);
+  const demand = new Array(12).fill(0);
+
+  schedules.forEach((r) => {
+    const q = regionQty[r.slug] || {};
+    r.despacho.forEach((m) => {
+      const n = Number(q[m]) || 0;
+      if (n) supply[mod12(m + r.transitMonths)] += n;
+    });
+  });
+
+  markets.forEach((mk) => {
+    const q = marketQty[mk.slug] || {};
+    const chains = chainsByCorte(mk);
+    Object.entries(chains).forEach(([corteMonth, chain]) => {
+      const n = Number(q[corteMonth]) || 0;
+      if (n) demand[chain.arrivalMonth] += n;
+    });
+  });
+
+  const byMonth = supply.map((s, i) => ({
+    month: i,
+    supply: s,
+    demand: demand[i],
+    delta: s - demand[i],
+  }));
+
+  return {
+    byMonth,
+    totals: {
+      supply: supply.reduce((a, b) => a + b, 0),
+      demand: demand.reduce((a, b) => a + b, 0),
+    },
+  };
+}
+
+/** Annual target vs allocated, per market. */
+export function marketProgress(market, marketQty) {
+  const q = marketQty[market.slug] || {};
+  const allocated = Object.values(q).reduce((a, b) => a + (Number(b) || 0), 0);
+  return {
+    target: market.target,
+    allocated,
+    remaining: market.target - allocated,
+    over: allocated > market.target,
+  };
+}
