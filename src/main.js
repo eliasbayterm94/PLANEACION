@@ -2,15 +2,17 @@ import { regions } from './data/regions.js';
 import { markets } from './data/markets.js';
 import { buildSchedules, CAMPAIGNS, YEAR } from './model.js';
 import { loadPlan, savePlanSlug, subscribeToPlan, isRemote, editor, setEditor } from './store.js';
-import { renderRegion } from './views/region.js';
 import { renderMarket } from './views/market.js';
 import { renderConsolidado } from './views/consolidado.js';
 import { renderProducts } from './views/products.js';
+import { renderCosechas } from './views/cosechas.js';
+import { renderRegionesEditor } from './views/regionesEditor.js';
 
 const schedules = buildSchedules(regions);
 
 const state = {
   view: 'consolidado',
+  editRegion: schedules[0]?.slug ?? null, // selected origin in the edit tab
   regionQty: {},
   marketQty: {},
   status: '',
@@ -25,8 +27,9 @@ const GROUP_ICON = {
 };
 
 const TABS = [
-  { id: 'consolidado', label: 'Consolidado', group: 'Plan' },
-  ...schedules.map((s) => ({ id: `region:${s.slug}`, label: s.name, group: 'Origen' })),
+  { id: 'consolidado', label: 'Consolidado', group: 'Plan', icon: 'layout-dashboard' },
+  { id: 'cosechas', label: 'Cosechas', group: 'Origen', icon: 'eye' },
+  { id: 'regiones', label: 'Editar regiones', group: 'Origen', icon: 'square-pen' },
   ...markets.map((m) => ({ id: `market:${m.slug}`, label: m.name, group: 'Destino' })),
   { id: 'products:1', label: CAMPAIGNS[1].name, group: 'Productos' },
   { id: 'products:2', label: CAMPAIGNS[2].name, group: 'Productos' },
@@ -85,7 +88,7 @@ function renderNav() {
     b.type = 'button';
     b.className = 'fc-sidebar-link' + (state.view === t.id ? ' active' : '');
     b.setAttribute('aria-current', state.view === t.id ? 'page' : 'false');
-    b.innerHTML = `<i data-lucide="${GROUP_ICON[t.group] || 'circle'}"></i><span class="label"></span>`;
+    b.innerHTML = `<i data-lucide="${t.icon || GROUP_ICON[t.group] || 'circle'}"></i><span class="label"></span>`;
     b.querySelector('.label').textContent = t.label;
     b.addEventListener('click', () => {
       state.view = t.id;
@@ -114,12 +117,18 @@ function renderView() {
       regionQty: state.regionQty,
       marketQty: state.marketQty,
     }));
-  } else if (kind === 'region') {
-    const schedule = schedules.find((s) => s.slug === arg);
-    root.appendChild(renderRegion({
-      schedule,
-      qty: state.regionQty[arg] || {},
-      onQty: (month, value) => updateQty('region', arg, month, value),
+  } else if (kind === 'cosechas') {
+    root.appendChild(renderCosechas({
+      schedules,
+      regionQty: state.regionQty,
+    }));
+  } else if (kind === 'regiones') {
+    root.appendChild(renderRegionesEditor({
+      schedules,
+      selectedSlug: state.editRegion,
+      onSelect: (slug) => { state.editRegion = slug; render(); },
+      qty: state.regionQty[state.editRegion] || {},
+      onQty: (month, value) => updateQty('region', state.editRegion, month, value),
     }));
   } else if (kind === 'market') {
     const market = markets.find((m) => m.slug === arg);

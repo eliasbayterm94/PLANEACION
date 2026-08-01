@@ -148,6 +148,36 @@
   color: var(--fc-navy);
 }
 
+/* --- Region picker (edit tab) ------------------------------------------- */
+.region-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--fc-space-6);
+}
+.region-pill {
+  font-family: var(--fc-font-body);
+  font-size: var(--fc-fs-12);
+  font-weight: var(--fc-fw-semibold);
+  letter-spacing: var(--fc-ls-loose);
+  padding: 8px 15px;
+  border-radius: var(--fc-radius-pill);
+  border: 1px solid var(--fc-ink-100);
+  background: #fff;
+  color: var(--fc-ink-500);
+  cursor: pointer;
+  transition: color var(--fc-dur-fast) var(--fc-ease-out),
+              background var(--fc-dur-fast) var(--fc-ease-out),
+              border-color var(--fc-dur-fast) var(--fc-ease-out);
+}
+.region-pill:hover { color: var(--fc-navy); background: var(--fc-cream); }
+.region-pill.active {
+  background: var(--fc-navy);
+  border-color: var(--fc-navy);
+  color: var(--fc-yellow);
+}
+.region-pill:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 2px; }
+
 /* --- Calendar grid ------------------------------------------------------ */
 .grid {
   display: grid;
@@ -160,6 +190,13 @@
   margin-bottom: var(--fc-space-3);
 }
 .grid--consolidado { grid-template-columns: 150px repeat(12, minmax(0, 1fr)); }
+
+/* Cosechas overview: many stacked rows, so keep them compact. */
+.grid--cosechas .cell,
+.grid--cosechas .row-label { min-height: 32px; }
+.grid--cosechas .cell--num,
+.grid--cosechas .cell--mirror { font-size: var(--fc-fs-12); }
+.grid--cosechas .cell-tag svg { width: 13px; height: 13px; }
 
 .month-head {
   font-family: var(--fc-font-display);

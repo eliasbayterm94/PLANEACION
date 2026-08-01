@@ -80,13 +80,21 @@ src/
     products.js      catalogue keyed by cutoff month
   views/
     consolidado.js   supply vs demand reconciliation
-    region.js        per-origin grid
+    cosechas.js      read-only overview of every origin at once ("Cosechas" tab)
+    regionesEditor.js  region picker + editable grid ("Editar regiones" tab)
+    region.js        per-origin grid (used by regionesEditor)
     market.js        per-market gantt
     products.js      releases per cutoff
   main.js            router, tabs, state
-  styles.css         Forest palette
+  forest-design-system.css  Forest Design System v1.0 (shell, tokens)
+  styles.css         planning calendar + cards on the Forest light theme
 supabase/schema.sql  table, audit trigger, realtime, RLS
 ```
+
+The origin side is split across two tabs: **Cosechas** (`cosechas.js`) is a
+read-only master calendar of all regions; **Editar regiones**
+(`regionesEditor.js`) is where despacho is captured, one region at a time via a
+picker. The selected origin lives in `state.editRegion`.
 
 State lives in `main.js` and flows down. Views are pure render functions that
 take data and callbacks — they never import the store or mutate state directly.
