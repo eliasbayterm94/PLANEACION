@@ -1,6 +1,6 @@
 import {
   listCountries, marketGoal, marketGoalTotal, warehouseGoal, warehouseGoalTotal,
-  countrySalidas, marketShipmentArrivals, warehouseAllocatedAll, containersToKg,
+  countrySalidasTotal, marketShipmentArrivals, warehouseAllocatedAll, containersToKg,
 } from '../model.js';
 
 /**
@@ -193,7 +193,7 @@ function countryCard(schedules, goals, shipments, leadLookup, onCountryMirc) {
     input.addEventListener('change', (e) => onCountryMirc(country, Math.max(0, Number(e.target.value) || 0)));
     row.appendChild(field('Meta MIRC (kg)', input));
 
-    const cont = countrySalidas(shipments, schedules, country, leadLookup);
+    const cont = countrySalidasTotal(shipments, country);
     row.appendChild(field('Salidas', valueSpan('metas-salidas', fmtKg(containersToKg(cont)))));
 
     card.appendChild(row);

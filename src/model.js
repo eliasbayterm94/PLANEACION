@@ -224,6 +224,78 @@ export const containersToKg = (c) => (Number(c) || 0) * KG_PER_CONTAINER;
 export const kgToContainers = (kg) => (Number(kg) || 0) / KG_PER_CONTAINER;
 
 // ---------------------------------------------------------------------------
+// Shipments v2 — keyed by producing COUNTRY -> warehouse -> month
+// ---------------------------------------------------------------------------
+// Shape: { [country]: { ship: { [warehouse]: { [monthIdx]: containers } } } }
+// The country is the origin tag; the warehouse is the destination (its market).
+// Aggregation helpers iterate Object.values(shipments) so they are agnostic to
+// the top-level key — only the per-country helpers below read it directly.
+
+/** Salidas by month for one country's shipments to one warehouse. */
+export function laneSalidas(shipments, country, wh) {
+  const arr = new Array(12).fill(0);
+  const months = shipments?.[country]?.ship?.[wh] || {};
+  Object.entries(months).forEach(([m, n]) => { arr[mod12(Number(m))] += Number(n) || 0; });
+  return arr;
+}
+
+/** Arrivals by month into one warehouse, across every country, by its lead. */
+export function warehouseLlegadas(shipments, leadLookup, wh) {
+  const arr = new Array(12).fill(0);
+  const lead = leadLookup[wh]?.lead ?? OFFSETS.despachoToEntrega;
+  Object.values(shipments || {}).forEach((c) => {
+    const months = c?.ship?.[wh];
+    if (!months) return;
+    Object.entries(months).forEach(([m, n]) => { arr[shipmentArrival(m, lead)] += Number(n) || 0; });
+  });
+  return arr;
+}
+
+/** Total containers shipped from one country (all warehouses). */
+export function countrySalidasTotal(shipments, country) {
+  const ship = shipments?.[country]?.ship || {};
+  return Object.values(ship).reduce(
+    (s, ms) => s + Object.values(ms).reduce((a, b) => a + (Number(b) || 0), 0), 0,
+  );
+}
+
+/** Global salidas by month (all countries, all warehouses). */
+export function totalSalidas(shipments) {
+  const arr = new Array(12).fill(0);
+  Object.values(shipments || {}).forEach((c) => {
+    Object.values(c?.ship || {}).forEach((ms) => {
+      Object.entries(ms).forEach(([m, n]) => { arr[mod12(Number(m))] += Number(n) || 0; });
+    });
+  });
+  return arr;
+}
+
+/** Global llegadas by month (all countries, each warehouse by its lead). */
+export function totalLlegadas(shipments, leadLookup) {
+  const arr = new Array(12).fill(0);
+  Object.values(shipments || {}).forEach((c) => {
+    Object.entries(c?.ship || {}).forEach(([wh, ms]) => {
+      const lead = leadLookup[wh]?.lead ?? OFFSETS.despachoToEntrega;
+      Object.entries(ms).forEach(([m, n]) => { arr[shipmentArrival(m, lead)] += Number(n) || 0; });
+    });
+  });
+  return arr;
+}
+
+/**
+ * Export capacity signal per month: how many origins have a despacho that month.
+ * Derived from the harvest calendar; low/zero months are the valle. Optionally
+ * scoped to one producing country.
+ */
+export function exportCapacity(schedules, country) {
+  const arr = new Array(12).fill(0);
+  schedules
+    .filter((s) => !country || s.country === country)
+    .forEach((s) => s.despacho.forEach((m) => { arr[mod12(m)] += 1; }));
+  return arr;
+}
+
+// ---------------------------------------------------------------------------
 // Goals — kg targets by category, and the country-level MIRC target
 // ---------------------------------------------------------------------------
 /** The two macro categories every region goal is split into. */

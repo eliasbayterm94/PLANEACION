@@ -17,7 +17,7 @@ const PHASES = [
   { key: 'entrega', name: 'Entrega', icon: 'package-check' },
 ];
 
-export function renderCosechas({ schedules, shipments }) {
+export function renderCosechas({ schedules }) {
   const el = document.createElement('div');
   el.appendChild(header());
   el.appendChild(legend());
@@ -25,7 +25,7 @@ export function renderCosechas({ schedules, shipments }) {
   const g = document.createElement('div');
   g.className = 'grid grid--gantt';
 
-  // Header row: corner + months + total.
+  // Header row: corner + months.
   g.appendChild(document.createElement('div'));
   MONTHS.forEach((m) => {
     const h = document.createElement('div');
@@ -33,16 +33,11 @@ export function renderCosechas({ schedules, shipments }) {
     h.textContent = m;
     g.appendChild(h);
   });
-  const totalHead = document.createElement('div');
-  totalHead.className = 'month-head gantt-total-head';
-  totalHead.textContent = 'Total';
-  g.appendChild(totalHead);
 
   [...schedules]
     .sort((a, b) => (primaryCampaign(a) || 9) - (primaryCampaign(b) || 9))
     .forEach((s) => {
       const camp = primaryCampaign(s);
-      const ship = shipments[s.slug]?.ship || {};
 
       const label = document.createElement('div');
       label.className = 'row-label';
@@ -73,16 +68,6 @@ export function renderCosechas({ schedules, shipments }) {
         }
         g.appendChild(cell);
       }
-
-      const total = Object.values(ship).reduce(
-        (sum, months) => sum + Object.values(months || {}).reduce((a, b) => a + (Number(b) || 0), 0),
-        0,
-      );
-      const totalCell = document.createElement('div');
-      totalCell.className = 'cell gantt-total';
-      totalCell.textContent = total > 0 ? total : '—';
-      if (total === 0) totalCell.classList.add('cell--empty');
-      g.appendChild(totalCell);
     });
 
   el.appendChild(g);
@@ -97,8 +82,8 @@ function header() {
     <p class="view-sub">
       Gantt de todas las regiones en una vista. Cada banda va de cosecha a
       entrega; los íconos marcan la fase de cada mes y el punto indica la
-      campaña. El total son los contenedores de salida asignados.
-      Para editar salidas, usa la pestaña <strong>Editar regiones</strong>.
+      campaña. Es informativo: la programación de salidas vive en
+      <strong>Programación de salidas</strong>.
       Los cortes son siempre el día ${CUTOFF_DAY}.
     </p>`;
   return wrap;

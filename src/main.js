@@ -2,7 +2,7 @@ import { regions } from './data/regions.js';
 import { markets } from './data/markets.js';
 import { defaultWarehouses, emptyWarehouseConfig } from './data/warehouses.js';
 import {
-  buildSchedules, CAMPAIGNS, YEAR, listWarehouses, warehouseLeadLookup, emptyGoals,
+  buildSchedules, CAMPAIGNS, YEAR, warehouseLeadLookup, emptyGoals,
 } from './model.js';
 import {
   loadPlan, saveWarehouse, saveShipment, saveGoals, GOALS_SLUG,
@@ -12,7 +12,7 @@ import { renderMarket } from './views/market.js';
 import { renderConsolidado } from './views/consolidado.js';
 import { renderProducts } from './views/products.js';
 import { renderCosechas } from './views/cosechas.js';
-import { renderRegionesEditor } from './views/regionesEditor.js';
+import { renderProgramacion } from './views/programacion.js';
 import { renderBodegas } from './views/bodegas.js';
 import { renderMetas } from './views/metas.js';
 
@@ -20,10 +20,10 @@ const schedules = buildSchedules(regions);
 
 const state = {
   view: 'consolidado',
-  editRegion: schedules[0]?.slug ?? null, // selected origin in the edit tab
-  shipments: {}, // { regionSlug: { warehouses: [wh], ship: {wh: {monthIdx: containers}} } }
+  planCountry: null, // selected producing country in the Programación cockpit
+  shipments: {}, // { country: { ship: { wh: { monthIdx: containers } } } }
   warehouses: {}, // { marketSlug: { primary, warehouses: [{name, lead}] } }
-  goals: emptyGoals(), // { regions: {slug: {community, mirc}}, countriesMIRC: {country: kg} }
+  goals: emptyGoals(), // { markets, warehouses, countriesMIRC }
   status: '',
 };
 
@@ -46,9 +46,9 @@ const GROUP_ICON = {
 
 const TABS = [
   { id: 'consolidado', label: 'Consolidado', group: 'Plan', icon: 'layout-dashboard' },
+  { id: 'programacion', label: 'Programación de salidas', group: 'Plan', icon: 'ship' },
   { id: 'metas', label: 'Metas', group: 'Plan', icon: 'target' },
   { id: 'cosechas', label: 'Cosechas', group: 'Origen', icon: 'eye' },
-  { id: 'regiones', label: 'Editar regiones', group: 'Origen', icon: 'square-pen' },
   ...markets.map((m) => ({ id: `market:${m.slug}`, label: m.name, group: 'Destino' })),
   { id: 'bodegas', label: 'Bodegas', group: 'Destino', icon: 'warehouse' },
   { id: 'products:1', label: CAMPAIGNS[1].name, group: 'Productos' },
@@ -73,42 +73,18 @@ function setStatus(kind, detail) {
   if (kind === 'saved') setTimeout(() => { el.textContent = ''; }, 1800);
 }
 
-// --- Shipment mutations (origin allocation, per region/warehouse) ----------
-function regionCopy(slug) {
-  const cur = state.shipments[slug] || { warehouses: [], ship: {} };
-  return {
-    warehouses: [...(cur.warehouses || [])],
-    ship: { ...(cur.ship || {}) },
-  };
-}
-
-function saveRegion(slug, value) {
-  state.shipments[slug] = value;
-  saveShipment(slug, value, setStatus);
-  render();
-}
-
-function setShip(slug, wh, month, containers) {
-  const v = regionCopy(slug);
-  const months = { ...(v.ship[wh] || {}) };
+// --- Shipment mutations (by producing country -> warehouse -> month) --------
+function setShip(country, wh, month, containers) {
+  const cur = state.shipments[country] || { ship: {} };
+  const ship = { ...(cur.ship || {}) };
+  const months = { ...(ship[wh] || {}) };
   if (containers > 0) months[month] = containers;
   else delete months[month];
-  v.ship[wh] = months;
-  if (!v.warehouses.includes(wh)) v.warehouses.push(wh);
-  saveRegion(slug, v);
-}
-
-function addWarehouse(slug, wh) {
-  const v = regionCopy(slug);
-  if (!v.warehouses.includes(wh)) v.warehouses.push(wh);
-  saveRegion(slug, v);
-}
-
-function removeWarehouse(slug, wh) {
-  const v = regionCopy(slug);
-  v.warehouses = v.warehouses.filter((w) => w !== wh);
-  delete v.ship[wh];
-  saveRegion(slug, v);
+  ship[wh] = months;
+  const value = { ship };
+  state.shipments[country] = value;
+  saveShipment(country, value, setStatus);
+  render();
 }
 
 // --- Goal mutations (kg targets by category + country MIRC) ----------------
@@ -192,7 +168,6 @@ function renderView() {
   const [kind, arg] = state.view.split(':');
 
   const leadLookup = warehouseLeadLookup(state.warehouses);
-  const allWarehouses = listWarehouses(state.warehouses, markets);
 
   if (kind === 'consolidado') {
     root.appendChild(renderConsolidado({
@@ -211,24 +186,19 @@ function renderView() {
       onWarehouseGoal: (wh, category, kg) => setWarehouseGoal(wh, category, kg),
       onCountryMirc: (country, kg) => setCountryMirc(country, kg),
     }));
-  } else if (kind === 'cosechas') {
-    root.appendChild(renderCosechas({
-      schedules,
+  } else if (kind === 'programacion') {
+    root.appendChild(renderProgramacion({
+      schedules, markets,
+      warehouses: state.warehouses,
+      goals: state.goals,
       shipments: state.shipments,
-    }));
-  } else if (kind === 'regiones') {
-    const slug = state.editRegion;
-    root.appendChild(renderRegionesEditor({
-      schedules,
-      selectedSlug: slug,
-      onSelect: (s) => { state.editRegion = s; render(); },
-      shipment: state.shipments[slug] || { warehouses: [], ship: {} },
-      allWarehouses,
       leadLookup,
-      onShip: (wh, month, containers) => setShip(slug, wh, month, containers),
-      onAddWarehouse: (wh) => addWarehouse(slug, wh),
-      onRemoveWarehouse: (wh) => removeWarehouse(slug, wh),
+      planCountry: state.planCountry,
+      onCountry: (c) => { state.planCountry = c; render(); },
+      onShip: (country, wh, month, containers) => setShip(country, wh, month, containers),
     }));
+  } else if (kind === 'cosechas') {
+    root.appendChild(renderCosechas({ schedules }));
   } else if (kind === 'market') {
     const market = markets.find((m) => m.slug === arg);
     root.appendChild(renderMarket({

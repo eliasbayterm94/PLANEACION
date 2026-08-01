@@ -68,27 +68,27 @@ of the model rather than being chosen — confirm it matches reality, or make
 
 ## Where containers are entered
 
-Allocation is **origin-driven and warehouse-aware**. In **Editar regiones** you
-pick a region, add the warehouses it ships to, and enter containers per warehouse
-per month (the **salida**). Each region+warehouse carries a **goal in kg**
-(`KG_PER_CONTAINER = 17500` in `model.js` converts containers ⇄ kg).
+Allocation lives in the **Programación de salidas** cockpit. Salidas are keyed by
+**producing country → warehouse → month** (containers). The country is a tab
+(Colombia / Rwanda); the cockpit is organised by **market → warehouse**. The
+warehouse (not the producing region) is the salida's key — origin granularity
+stops at the country. `KG_PER_CONTAINER = 17500` converts containers ⇄ kg.
 
 Everything else is **derived** from those shipments:
 
-- **Llegada** (arrival) = salida month + `round(warehouse.lead)` — visible right
-  under the salida row.
-- **Destino / market view** is read-only: it aggregates every region's shipments
-  to that market's warehouses into arrivals, shown against the market target.
-  There is no manual "Corte" capture anymore.
-- **Consolidado** shows salidas by region and llegadas by market — both from the
-  same shipment data — plus allocated-vs-target. (No more supply/demand delta:
-  there is a single source now.)
+- **Llegada** (arrival) = salida month + `round(warehouse.lead)` — shown under
+  each warehouse's salida row (combined across countries).
+- **Capacidad export.** row = `exportCapacity(schedules, country)`: how many of
+  that country's origins have a despacho each month. Low/zero months are the
+  **valle** (harvest bottleneck) — a soft signal, not a block.
+- **Destino / market view** and **Consolidado** aggregate shipments (read-only);
+  Consolidado shows salidas by country and llegadas by market vs target.
+- **Metas** shows salidas (by country) / llegadas (by market) as context.
 
-Persisted per region as scope `shipment`, one row each:
-`{ goals: { whName: kg }, ship: { whName: { monthIdx: containers } } }`.
-
-Shipments are **independent of the cosecha calendar**. The derived cutoff months
-are shown as reference markers only; the **Cosechas** Gantt is informational.
+Persisted per country as scope `shipment`, one row each:
+`{ ship: { whName: { monthIdx: containers } } }`. The month header carries the
+campaign band (`campaignOfMonth`); shipments are otherwise **independent of the
+cosecha calendar** — the **Cosechas** Gantt is purely informational.
 
 ### Goals (Metas tab)
 
@@ -120,12 +120,11 @@ src/
     warehouses.js    destination warehouses + lead times (seed defaults)
     products.js      catalogue keyed by cutoff month
   views/
-    consolidado.js   supply vs demand reconciliation
+    consolidado.js   flow + salidas by country + llegadas by market
+    programacion.js  salidas cockpit: country tab, market→warehouse, valle/meta
     metas.js         kg goals by category + country MIRC target ("Metas" tab)
-    cosechas.js      read-only overview of every origin at once ("Cosechas" tab)
-    regionesEditor.js  region picker + editable grid ("Editar regiones" tab)
-    region.js        per-origin grid (used by regionesEditor)
-    market.js        per-market gantt + warehouse panel
+    cosechas.js      read-only Gantt of every origin at once ("Cosechas" tab)
+    market.js        per-market arrivals (derived, read-only)
     bodegas.js       edit warehouses + lead times per destination ("Bodegas" tab)
     products.js      releases per cutoff
   main.js            router, tabs, state
@@ -134,10 +133,9 @@ src/
 supabase/schema.sql  table, audit trigger, realtime, RLS
 ```
 
-The origin side is split across two tabs: **Cosechas** (`cosechas.js`) is a
-read-only master calendar of all regions; **Editar regiones**
-(`regionesEditor.js`) is where despacho is captured, one region at a time via a
-picker. The selected origin lives in `state.editRegion`.
+**Cosechas** (`cosechas.js`) is a read-only master Gantt of all regions.
+Salidas are captured in **Programación de salidas** (`programacion.js`); the
+selected producing country lives in `state.planCountry`.
 
 State lives in `main.js` and flows down. Views are pure render functions that
 take data and callbacks — they never import the store or mutate state directly.

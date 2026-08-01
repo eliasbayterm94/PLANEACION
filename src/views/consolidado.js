@@ -1,36 +1,31 @@
 import {
-  MONTHS, primaryCampaign, CAMPAIGNS, mod12,
-  regionShipmentSummary, marketShipmentArrivals, containersToKg, kgToContainers,
+  MONTHS, mod12, listCountries, totalSalidas, totalLlegadas,
+  marketShipmentArrivals, containersToKg,
 } from '../model.js';
 import { downloadCSV } from '../store.js';
 
 /**
- * Consolidated view — the whole plan from a single source: region shipments.
+ * Consolidated view — the whole plan from one source: shipments by country.
  *
- * Salidas (per region) and llegadas (per market, derived from each warehouse
- * lead) come from the same data, so origin and destination can no longer
- * silently diverge. What the view surfaces instead is allocated vs target.
+ * Salidas (by producing country) and llegadas (by market, each warehouse by its
+ * lead) come from the same data. The view surfaces the monthly flow, salidas by
+ * country, llegadas by market, and allocated-vs-target.
  */
 export function renderConsolidado({ schedules, markets, shipments, leadLookup }) {
   const el = document.createElement('div');
 
-  const regionSummaries = schedules.map((s) => ({
-    s, ...regionShipmentSummary(shipments[s.slug], leadLookup),
-  }));
-  const marketSummaries = markets.map((mk) => ({
-    mk, ...marketShipmentArrivals(shipments, leadLookup, mk.slug),
-  }));
-
-  const allocated = regionSummaries.reduce((a, r) => a + r.allocated, 0);
+  const salidas = totalSalidas(shipments);
+  const llegadas = totalLlegadas(shipments, leadLookup);
+  const allocated = salidas.reduce((a, b) => a + b, 0);
   const target = markets.reduce((a, m) => a + m.target, 0);
 
   el.appendChild(header(allocated, target));
-  el.appendChild(flowGrid(regionSummaries));
-  el.appendChild(sectionTitle('Salidas por región'));
-  el.appendChild(regionGrid(regionSummaries));
+  el.appendChild(flowGrid(salidas, llegadas));
+  el.appendChild(sectionTitle('Salidas por país productor'));
+  el.appendChild(countryGrid(schedules, shipments));
   el.appendChild(sectionTitle('Llegadas por mercado'));
-  el.appendChild(marketGrid(marketSummaries));
-  el.appendChild(exportBar(regionSummaries, marketSummaries, allocated, target));
+  el.appendChild(marketGrid(markets, shipments, leadLookup));
+  el.appendChild(exportBar(schedules, markets, shipments, leadLookup, allocated, target));
   return el;
 }
 
@@ -49,19 +44,10 @@ function header(allocated, target) {
   return wrap;
 }
 
-/** Monthly salidas vs llegadas across all regions. */
-function flowGrid(regionSummaries) {
+function flowGrid(salidas, llegadas) {
   const g = document.createElement('div');
   g.className = 'grid grid--consolidado';
   headRow(g);
-
-  const salidas = new Array(12).fill(0);
-  const llegadas = new Array(12).fill(0);
-  regionSummaries.forEach((r) => {
-    r.salidas.forEach((n, i) => { salidas[i] += n; });
-    r.llegadas.forEach((n, i) => { llegadas[i] += n; });
-  });
-
   [['Salidas', salidas], ['Llegadas', llegadas]].forEach(([label, arr]) => {
     const l = document.createElement('div');
     l.className = 'row-label row-label--strong';
@@ -75,77 +61,58 @@ function flowGrid(regionSummaries) {
       g.appendChild(cell);
     }
   });
-
   return g;
 }
 
-function regionGrid(regionSummaries) {
+function countryMonthSalidas(shipments, country) {
+  const arr = new Array(12).fill(0);
+  const ship = shipments?.[country]?.ship || {};
+  Object.values(ship).forEach((ms) => {
+    Object.entries(ms).forEach(([m, n]) => { arr[mod12(Number(m))] += Number(n) || 0; });
+  });
+  return arr;
+}
+
+function countryGrid(schedules, shipments) {
   const g = document.createElement('div');
   g.className = 'grid grid--consolidado';
   headRow(g);
-
-  let lastCampaign = null;
-  [...regionSummaries]
-    .sort((a, b) => (primaryCampaign(a.s) || 9) - (primaryCampaign(b.s) || 9))
-    .forEach(({ s, salidas }) => {
-      const camp = primaryCampaign(s);
-      if (camp !== lastCampaign) {
-        const sep = document.createElement('div');
-        sep.className = 'group-label';
-        sep.textContent = CAMPAIGNS[camp]?.name ?? 'Sin campaña';
-        g.appendChild(sep);
-        lastCampaign = camp;
-      }
-
-      const l = document.createElement('div');
-      l.className = 'row-label';
-      l.textContent = s.name;
-      g.appendChild(l);
-
-      for (let i = 0; i < 12; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell cell--num';
-        if (salidas[i] > 0) {
-          cell.textContent = salidas[i];
-          cell.style.background = s.color;
-          cell.classList.add('cell--on');
-        } else {
-          cell.textContent = '—';
-          cell.classList.add('cell--empty');
-        }
-        g.appendChild(cell);
-      }
-    });
-
+  listCountries(schedules).forEach((country) => {
+    const arr = countryMonthSalidas(shipments, country);
+    const l = document.createElement('div');
+    l.className = 'row-label';
+    l.textContent = country;
+    g.appendChild(l);
+    for (let i = 0; i < 12; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell cell--num';
+      if (arr[i] > 0) { cell.textContent = arr[i]; cell.classList.add('cell--on'); cell.style.background = 'var(--fc-yellow-200)'; }
+      else { cell.textContent = '—'; cell.classList.add('cell--empty'); }
+      g.appendChild(cell);
+    }
+  });
   return g;
 }
 
-function marketGrid(marketSummaries) {
+function marketGrid(markets, shipments, leadLookup) {
   const g = document.createElement('div');
   g.className = 'grid grid--consolidado';
   headRow(g);
-
-  marketSummaries.forEach(({ mk, llegadas, allocated }) => {
+  markets.forEach((mk) => {
+    const { llegadas, allocated } = marketShipmentArrivals(shipments, leadLookup, mk.slug);
     const over = allocated > mk.target;
     const l = document.createElement('div');
     l.className = 'row-label';
     l.innerHTML = `${mk.name} <span class="row-meta ${over ? 'row-meta--over' : ''}">${allocated}/${mk.target}</span>`;
     g.appendChild(l);
-
     for (let i = 0; i < 12; i++) {
       const cell = document.createElement('div');
       cell.className = 'cell cell--num';
-      if (llegadas[i] > 0) {
-        cell.textContent = llegadas[i];
-        cell.classList.add('cell--on', 'cell--market');
-      } else {
-        cell.textContent = '—';
-        cell.classList.add('cell--empty');
-      }
+      if (llegadas[i] > 0) { cell.textContent = llegadas[i]; cell.classList.add('cell--on', 'cell--market'); }
+      else { cell.textContent = '—'; cell.classList.add('cell--empty'); }
       g.appendChild(cell);
     }
   });
-
   return g;
 }
 
@@ -166,25 +133,26 @@ function sectionTitle(text) {
   return h;
 }
 
-function exportBar(regionSummaries, marketSummaries, allocated, target) {
+function exportBar(schedules, markets, shipments, leadLookup, allocated, target) {
   const bar = document.createElement('div');
   bar.className = 'export-bar';
-
   const btn = document.createElement('button');
   btn.className = 'btn';
   btn.textContent = 'Descargar CSV';
   btn.addEventListener('click', () => {
     const rows = [['Tipo', 'Nombre', ...MONTHS, 'Total cont', 'Total kg']];
-    regionSummaries.forEach(({ s, salidas, allocated: a }) => {
-      rows.push(['Salidas', s.name, ...salidas, a, Math.round(containersToKg(a))]);
+    listCountries(schedules).forEach((country) => {
+      const arr = countryMonthSalidas(shipments, country);
+      const t = arr.reduce((a, b) => a + b, 0);
+      rows.push(['Salidas', country, ...arr, t, Math.round(containersToKg(t))]);
     });
-    marketSummaries.forEach(({ mk, llegadas, allocated: a }) => {
+    markets.forEach((mk) => {
+      const { llegadas, allocated: a } = marketShipmentArrivals(shipments, leadLookup, mk.slug);
       rows.push(['Llegadas', mk.name, ...llegadas, a, Math.round(containersToKg(a))]);
     });
     rows.push(['Total', 'Asignado vs meta', ...new Array(12).fill(''), `${allocated}/${target}`, '']);
     downloadCSV('forest-plan-2027.csv', rows);
   });
-
   bar.appendChild(btn);
   return bar;
 }
