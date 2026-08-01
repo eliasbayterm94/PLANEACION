@@ -304,25 +304,48 @@ export function exportCapacity(schedules, country) {
 
 export const productKey = (cutoffMonth, name) => `${cutoffMonth}::${name}`;
 
-/** One product+region allocation, with derived free-available. */
-export function allocCell(alloc, key, market) {
-  const a = alloc?.[key]?.[market] || {};
-  const base = Number(a.base) || 0;
-  const libre = Number(a.libre) || 0;
-  const asegurado = Number(a.asegurado) || 0;
-  return { base, libre, asegurado, libreDisp: libre - asegurado, total: base + libre };
-}
+/** Default committed share of a product's capacity (rest is Libre). */
+export const DEFAULT_COMPROMETIDO_PCT = 70;
 
-/** Roll up a set of product keys for one market. */
-export function allocMarketRollup(alloc, keys, market) {
-  const acc = { base: 0, libre: 0, asegurado: 0 };
-  keys.forEach((k) => {
-    const c = allocCell(alloc, k, market);
-    acc.base += c.base; acc.libre += c.libre; acc.asegurado += c.asegurado;
+/**
+ * Fair-share allocation of one product's capacity across sales regions,
+ * weighted by each market's total meta. Overrides lock a region's kg; the rest
+ * of the capacity redistributes over the non-locked markets by meta share. Each
+ * region's total then splits into Comprometido (pct) + Libre (1−pct).
+ *
+ * @param p             { cap, pct?, ov?: { marketSlug: kg } }
+ * @param marketMetas   [{ slug, meta }]
+ * @param globalPct     fallback committed % when the product has no override
+ * @returns { byMarket: { slug: {total, comprometido, libre, locked} }, cap, pct, unassigned }
+ */
+export function allocateProduct(p, marketMetas, globalPct = DEFAULT_COMPROMETIDO_PCT) {
+  const cap = Number(p?.cap) || 0;
+  const pct = (p?.pct != null ? Number(p.pct) : globalPct) / 100;
+  const ov = p?.ov || {};
+
+  let lockedTotal = 0;
+  marketMetas.forEach(({ slug }) => {
+    if (ov[slug] != null) lockedTotal += Number(ov[slug]) || 0;
   });
-  acc.total = acc.base + acc.libre;
-  acc.libreDisp = acc.libre - acc.asegurado;
-  return acc;
+  const remaining = Math.max(0, cap - lockedTotal);
+  const auto = marketMetas.filter((m) => ov[m.slug] == null && m.meta > 0);
+  const denom = auto.reduce((s, m) => s + m.meta, 0);
+
+  const byMarket = {};
+  marketMetas.forEach(({ slug, meta }) => {
+    let total;
+    if (ov[slug] != null) total = Number(ov[slug]) || 0;
+    else total = denom > 0 && meta > 0 ? remaining * (meta / denom) : 0;
+    byMarket[slug] = {
+      total,
+      comprometido: total * pct,
+      libre: total * (1 - pct),
+      locked: ov[slug] != null,
+    };
+  });
+
+  const assigned = Object.values(byMarket).reduce((s, x) => s + x.total, 0);
+  return { byMarket, cap, pct, unassigned: Math.max(0, cap - assigned) };
 }
 
 // ---------------------------------------------------------------------------

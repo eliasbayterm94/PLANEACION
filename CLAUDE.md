@@ -108,15 +108,18 @@ context and the country card shows salidas (kg) from its producing regions.
 
 ### Product allocation (Campaña tabs)
 
-The **Campaña 1 / 2** tabs (`products.js`) carry the commitment layer, per
-product × **sales region** (market), in kg: **Base** (reserved) + **Libre**
-(available); **Asegurado** (secured sales) commits Libre first, so
-`libreDisp = libre − asegurado` (negative = oversold). A rollup per market
-(Base / Asegurado / Libre) shows coverage vs the market's kg goal. Persisted as a
-single row, scope `alloc`, slug `plan`:
-`{ [productKey]: { [marketSlug]: { base, libre, asegurado } } }` where
-`productKey = ${cutoffMonth}::${name}`. Asegurado is manual today; wiring it to
-HubSpot deals (backlog 4) is the next step.
+The **Campaña 1 / 2** tabs (`products.js`) carry the commitment plan, **capacity
+driven**. Per product you set a **Capacidad** (kg); `allocateProduct` in
+`model.js` fair-shares it across sales regions weighted by each market's **total
+meta**, then splits each region's total into **Comprometido** (a global % default
+70) + **Libre**. Overrides lock a region's kg and the remaining capacity
+redistributes over the non-locked markets by meta share; leftover shows as *Sin
+asignar*. The top shows **fill rate** (Σ capacidad vs Σ meta) and a per-market
+rollup (Comprometido / Libre vs meta). Persisted as one row, scope `alloc`, slug
+`plan`: `{ pctComprometido, products: { [productKey]: { cap, pct, ov: { market: kg } } } }`
+where `productKey = ${cutoffMonth}::${name}` and per-product `pct` (null = use
+global) / `ov` are optional. Actual secured sales are **not** tracked yet —
+Libre is the plan buffer; wiring real deals (HubSpot, backlog 4) is the next step.
 
 ---
 

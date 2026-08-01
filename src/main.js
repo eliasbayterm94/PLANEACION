@@ -3,6 +3,7 @@ import { markets } from './data/markets.js';
 import { defaultWarehouses, emptyWarehouseConfig } from './data/warehouses.js';
 import {
   buildSchedules, CAMPAIGNS, YEAR, warehouseLeadLookup, emptyGoals,
+  DEFAULT_COMPROMETIDO_PCT,
 } from './model.js';
 import {
   loadPlan, saveWarehouse, saveShipment, saveGoals, saveAlloc, GOALS_SLUG, ALLOC_SLUG,
@@ -121,42 +122,53 @@ function setCountryMirc(country, kg) {
   saveGoalsState(g);
 }
 
-// --- Product allocation mutations (Base/Libre/Asegurado per product/market) --
+// --- Product allocation mutations (capacity-driven, fair-share by meta) ------
 function saveAllocState(value) {
   state.alloc = value;
   saveAlloc(value, setStatus);
   render();
 }
 
-function allocCopy(key) {
-  const cur = state.alloc[key] || {};
-  const out = {};
-  Object.entries(cur).forEach(([mk, v]) => { out[mk] = { ...v }; });
-  return out;
+function allocBase() {
+  return {
+    pctComprometido: state.alloc?.pctComprometido ?? DEFAULT_COMPROMETIDO_PCT,
+    products: { ...(state.alloc?.products || {}) },
+  };
 }
 
-function setAlloc(key, market, field, kg) {
-  const a = { ...state.alloc };
-  const forKey = allocCopy(key);
-  forKey[market] = { base: 0, libre: 0, asegurado: 0, ...(forKey[market] || {}), [field]: kg };
-  a[key] = forKey;
+function productCopy(a, key) {
+  const cur = a.products[key] || {};
+  return { cap: cur.cap || 0, pct: cur.pct ?? null, ov: { ...(cur.ov || {}) } };
+}
+
+function setGlobalPct(pct) {
+  const a = allocBase();
+  a.pctComprometido = pct;
   saveAllocState(a);
 }
 
-function addAllocRegion(key, market) {
-  const a = { ...state.alloc };
-  const forKey = allocCopy(key);
-  if (!forKey[market]) forKey[market] = { base: 0, libre: 0, asegurado: 0 };
-  a[key] = forKey;
+function setCap(key, kg) {
+  const a = allocBase();
+  const p = productCopy(a, key);
+  p.cap = kg;
+  a.products[key] = p;
   saveAllocState(a);
 }
 
-function removeAllocRegion(key, market) {
-  const a = { ...state.alloc };
-  const forKey = allocCopy(key);
-  delete forKey[market];
-  if (Object.keys(forKey).length) a[key] = forKey;
-  else delete a[key];
+function setProductPct(key, pct) {
+  const a = allocBase();
+  const p = productCopy(a, key);
+  p.pct = pct; // number or null
+  a.products[key] = p;
+  saveAllocState(a);
+}
+
+function setOverride(key, market, kg) {
+  const a = allocBase();
+  const p = productCopy(a, key);
+  if (kg == null) delete p.ov[market];
+  else p.ov[market] = kg;
+  a.products[key] = p;
   saveAllocState(a);
 }
 
@@ -264,9 +276,10 @@ function renderView() {
       warehouses: state.warehouses,
       goals: state.goals,
       alloc: state.alloc,
-      onAlloc: (key, market, field, kg) => setAlloc(key, market, field, kg),
-      onAddRegion: (key, market) => addAllocRegion(key, market),
-      onRemoveRegion: (key, market) => removeAllocRegion(key, market),
+      onCap: (key, kg) => setCap(key, kg),
+      onProductPct: (key, pct) => setProductPct(key, pct),
+      onOverride: (key, market, kg) => setOverride(key, market, kg),
+      onGlobalPct: (pct) => setGlobalPct(pct),
     }));
   }
 }
@@ -314,7 +327,7 @@ async function init() {
   state.warehouses = buildWarehouses(warehouse);
   state.shipments = shipment || {};
   state.goals = goals?.[GOALS_SLUG] || emptyGoals();
-  state.alloc = alloc?.[ALLOC_SLUG] || {};
+  state.alloc = alloc?.[ALLOC_SLUG] || { pctComprometido: DEFAULT_COMPROMETIDO_PCT, products: {} };
   if (error) setStatus('error', error);
 
   render();

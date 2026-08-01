@@ -1,55 +1,42 @@
 import {
   monthName, CUTOFF_DAY, OFFSETS, mod12, campaignOfMonth, CAMPAIGNS,
-  productKey, allocCell, allocMarketRollup, marketGoalTotal, warehouseGoalTotal,
-  containersToKg, kgToContainers,
+  productKey, allocateProduct, marketGoalTotal, warehouseGoalTotal,
+  kgToContainers, DEFAULT_COMPROMETIDO_PCT,
 } from '../model.js';
 import { productReleases } from '../data/products.js';
 
 /**
- * Products view — catalogue per cutoff PLUS the commitment layer.
+ * Products view — catalogue per cutoff + capacity-driven commitment plan.
  *
- * Per product, per sales region (market): Base (reserved) + Libre (available) in
- * kg; Asegurado (secured sales) commits Libre first. Top of the campaign shows a
- * rollup per market (Base / Asegurado / Libre disponible) against the market's
- * kg goal. Quantities are in kg (1 container = KG_PER_CONTAINER kg).
+ * Per product you set a Capacidad (kg). It is fair-share allocated across sales
+ * regions weighted by each market's total meta, then split into Comprometido
+ * (global % default 70) + Libre. Overrides lock a region's kg and the rest
+ * redistributes. Top: fill rate (capacity vs meta) per market and global.
  */
 export function renderProducts({
   campaign, markets, warehouses, goals, alloc,
-  onAlloc, onAddRegion, onRemoveRegion,
+  onCap, onProductPct, onOverride, onGlobalPct,
 }) {
   const el = document.createElement('div');
+  const products = alloc?.products || {};
+  const globalPct = alloc?.pctComprometido ?? DEFAULT_COMPROMETIDO_PCT;
+
+  const marketMetas = markets.map((mk) => ({
+    slug: mk.slug, name: mk.name, meta: marketMeta(goals, mk, warehouses),
+  }));
+
   const releases = productReleases
     .filter((r) => campaignOfMonth(r.cutoffMonth) === campaign)
     .sort((a, b) => order(a.cutoffMonth, campaign) - order(b.cutoffMonth, campaign));
 
-  el.appendChild(header(campaign));
-  el.appendChild(rollup(releases, markets, warehouses, goals, alloc));
+  el.appendChild(header(campaign, globalPct, onGlobalPct));
+  el.appendChild(rollup(releases, marketMetas, products, globalPct));
 
   releases.forEach((r) => {
-    el.appendChild(releaseCard(r, campaign, markets, alloc, onAlloc, onAddRegion, onRemoveRegion));
+    el.appendChild(releaseCard(r, campaign, marketMetas, products, globalPct, onCap, onProductPct, onOverride));
   });
 
   return el;
-}
-
-function header(campaign) {
-  const head = document.createElement('div');
-  head.className = 'view-head';
-  head.innerHTML = `
-    <h2>Productos y compromisos — ${CAMPAIGNS[campaign].name}</h2>
-    <p class="view-sub">
-      Por producto y <strong>región de venta</strong>: <strong>Base</strong> (reservado) +
-      <strong>Libre</strong> (disponible). Las <strong>ventas aseguradas</strong> comprometen
-      lo Libre primero. En kg; el equivalente en contenedores se muestra al lado.
-    </p>`;
-  return head;
-}
-
-/** All product keys in a campaign (for the market rollup). */
-function campaignKeys(releases) {
-  const keys = [];
-  releases.forEach((r) => r.items.forEach((name) => keys.push(productKey(r.cutoffMonth, name))));
-  return keys;
 }
 
 function marketMeta(goals, mk, warehouses) {
@@ -59,38 +46,99 @@ function marketMeta(goals, mk, warehouses) {
   return marketGoalTotal(goals, mk.slug);
 }
 
-function rollup(releases, markets, warehouses, goals, alloc) {
-  const keys = campaignKeys(releases);
+function header(campaign, globalPct, onGlobalPct) {
+  const head = document.createElement('div');
+  head.className = 'view-head';
+  head.innerHTML = `
+    <h2>Productos y compromisos — ${CAMPAIGNS[campaign].name}</h2>
+    <p class="view-sub">
+      Pon una <strong>capacidad</strong> por producto (kg). Se reparte por región de
+      venta según su <strong>meta</strong>, y se divide en
+      <strong>Comprometido</strong> + <strong>Libre</strong>. El Libre se vende por
+      demanda. Overrides fijan kg por región; el resto se redistribuye.
+    </p>`;
+  const ctl = document.createElement('div');
+  ctl.className = 'prod-global';
+  ctl.innerHTML = '<span>Comprometido global</span>';
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0'; input.max = '100'; input.step = '5';
+  input.className = 'metas-input';
+  input.value = globalPct;
+  input.setAttribute('aria-label', 'Porcentaje comprometido global');
+  input.addEventListener('change', (e) => {
+    const v = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+    onGlobalPct(v);
+  });
+  ctl.appendChild(input);
+  const suffix = document.createElement('span');
+  suffix.textContent = `% · Libre ${100 - globalPct}%`;
+  ctl.appendChild(suffix);
+  head.appendChild(ctl);
+  return head;
+}
+
+function campaignAlloc(releases, marketMetas, products, globalPct) {
+  // Aggregate comprometido/libre per market + total capacity, across the campaign.
+  const perMarket = {};
+  marketMetas.forEach((m) => { perMarket[m.slug] = { comprometido: 0, libre: 0 }; });
+  let totalCap = 0;
+  releases.forEach((r) => r.items.forEach((name) => {
+    const p = products[productKey(r.cutoffMonth, name)];
+    if (!p) return;
+    totalCap += Number(p.cap) || 0;
+    const a = allocateProduct(p, marketMetas, globalPct);
+    marketMetas.forEach((m) => {
+      perMarket[m.slug].comprometido += a.byMarket[m.slug].comprometido;
+      perMarket[m.slug].libre += a.byMarket[m.slug].libre;
+    });
+  }));
+  return { perMarket, totalCap };
+}
+
+function rollup(releases, marketMetas, products, globalPct) {
+  const { perMarket, totalCap } = campaignAlloc(releases, marketMetas, products, globalPct);
+  const totalMeta = marketMetas.reduce((s, m) => s + m.meta, 0);
+
   const wrap = document.createElement('div');
-  wrap.className = 'prod-rollup';
 
-  markets.forEach((mk) => {
-    const r = allocMarketRollup(alloc, keys, mk.slug);
-    const meta = marketMeta(goals, mk, warehouses);
-    const cov = meta ? Math.round((r.total / meta) * 100) : 0;
+  const fill = document.createElement('div');
+  fill.className = 'prod-fill';
+  const fillPct = totalMeta ? Math.round((totalCap / totalMeta) * 100) : 0;
+  fill.innerHTML =
+    `Capacidad total <strong>${fmtKg(totalCap)}</strong> (${kgToContainers(totalCap).toFixed(1)} cont) · ` +
+    `Meta total <strong>${fmtKg(totalMeta)}</strong> · ` +
+    `<strong class="tally tally--${fillPct >= 100 ? 'exact' : 'under'}">fill ${fillPct}%</strong>`;
+  wrap.appendChild(fill);
 
+  const cards = document.createElement('div');
+  cards.className = 'prod-rollup';
+  marketMetas.forEach((m) => {
+    const r = perMarket[m.slug];
+    const total = r.comprometido + r.libre;
+    const cov = m.meta ? Math.round((total / m.meta) * 100) : 0;
     const card = document.createElement('div');
     card.className = 'prod-rollup-card';
     card.innerHTML =
-      `<div class="prod-rollup-name">${mk.name}</div>` +
+      `<div class="prod-rollup-name">${m.name}</div>` +
       `<div class="prod-rollup-bar">` +
-        `<span class="seg seg-base" style="flex:${r.base || 0}"></span>` +
-        `<span class="seg seg-aseg" style="flex:${Math.min(r.asegurado, r.libre) || 0}"></span>` +
-        `<span class="seg seg-libre" style="flex:${Math.max(0, r.libreDisp) || 0}"></span>` +
+        `<span class="seg seg-base" style="flex:${r.comprometido || 0}"></span>` +
+        `<span class="seg seg-libre" style="flex:${r.libre || 0}"></span>` +
+        `<span class="seg seg-gap" style="flex:${Math.max(0, m.meta - total) || 0}"></span>` +
       `</div>` +
       `<div class="prod-rollup-nums">` +
-        `<span><i class="dot dot-base"></i>Base ${fmtKg(r.base)}</span>` +
-        `<span><i class="dot dot-aseg"></i>Aseg ${fmtKg(r.asegurado)}</span>` +
-        `<span><i class="dot dot-libre"></i>Libre ${fmtKg(Math.max(0, r.libreDisp))}</span>` +
+        `<span><i class="dot dot-base"></i>Comp ${fmtKg(r.comprometido)}</span>` +
+        `<span><i class="dot dot-libre"></i>Libre ${fmtKg(r.libre)}</span>` +
       `</div>` +
-      `<div class="prod-rollup-meta">${fmtKg(r.total)} plan${meta ? ` · meta ${fmtKg(meta)} · ${cov}%` : ''}</div>`;
-    wrap.appendChild(card);
+      `<div class="prod-rollup-meta">${fmtKg(total)} plan${m.meta ? ` · meta ${fmtKg(m.meta)} · ${cov}%` : ' · sin meta'}</div>`;
+    cards.appendChild(card);
   });
+  wrap.appendChild(cards);
 
   return wrap;
 }
 
-function releaseCard(r, campaign, markets, alloc, onAlloc, onAddRegion, onRemoveRegion) {
+function releaseCard(r, campaign, marketMetas, products, globalPct, onCap, onProductPct, onOverride) {
   const sampleMonth = mod12(r.cutoffMonth + OFFSETS.corteToMuestra);
   const card = document.createElement('article');
   card.className = 'card prod-card';
@@ -107,91 +155,91 @@ function releaseCard(r, campaign, markets, alloc, onAlloc, onAddRegion, onRemove
   const list = document.createElement('div');
   list.className = 'prod-items';
   r.items.forEach((name) => {
-    list.appendChild(productItem(r.cutoffMonth, name, markets, alloc, onAlloc, onAddRegion, onRemoveRegion));
+    list.appendChild(productItem(r.cutoffMonth, name, marketMetas, products, globalPct, onCap, onProductPct, onOverride));
   });
   card.appendChild(list);
-
   return card;
 }
 
-function productItem(cutoffMonth, name, markets, alloc, onAlloc, onAddRegion, onRemoveRegion) {
+function productItem(cutoffMonth, name, marketMetas, products, globalPct, onCap, onProductPct, onOverride) {
   const key = productKey(cutoffMonth, name);
-  const allocated = alloc[key] || {};
+  const p = products[key] || {};
+  const cap = Number(p.cap) || 0;
+
   const wrap = document.createElement('div');
   wrap.className = 'prod-item';
 
-  // Header: name + total
   const head = document.createElement('div');
-  head.className = 'prod-item-head';
-  let total = 0;
-  markets.forEach((mk) => { total += allocCell(alloc, key, mk.slug).total; });
-  head.innerHTML =
-    `<span class="prod-item-name">${name}</span>` +
-    (total > 0 ? `<span class="prod-item-total">${fmtKg(total)} · ${kgToContainers(total).toFixed(1)} cont</span>` : '');
+  head.className = 'prod-item-head prod-cap-head';
+  const nm = document.createElement('span');
+  nm.className = 'prod-item-name';
+  nm.textContent = name;
+  head.appendChild(nm);
+
+  const capInput = document.createElement('input');
+  capInput.type = 'number';
+  capInput.min = '0'; capInput.step = '1000';
+  capInput.className = 'alloc-input prod-cap-input';
+  capInput.value = cap || '';
+  capInput.placeholder = 'Capacidad kg';
+  capInput.setAttribute('aria-label', `Capacidad de ${name} en kg`);
+  capInput.addEventListener('change', (e) => onCap(key, Math.max(0, Number(e.target.value) || 0)));
+  head.appendChild(capInput);
+
+  const pctInput = document.createElement('input');
+  pctInput.type = 'number';
+  pctInput.min = '0'; pctInput.max = '100'; pctInput.step = '5';
+  pctInput.className = 'alloc-input prod-pct-input';
+  pctInput.value = p.pct != null ? p.pct : '';
+  pctInput.placeholder = `${globalPct}%`;
+  pctInput.title = 'Comprometido % (vacío = global)';
+  pctInput.setAttribute('aria-label', `Comprometido % de ${name}`);
+  pctInput.addEventListener('change', (e) => {
+    const raw = e.target.value;
+    onProductPct(key, raw === '' ? null : Math.min(100, Math.max(0, Number(raw) || 0)));
+  });
+  head.appendChild(pctInput);
+
   wrap.appendChild(head);
 
-  // Allocation rows for markets already added
-  markets.filter((mk) => allocated[mk.slug]).forEach((mk) => {
-    const c = allocCell(alloc, key, mk.slug);
-    const row = document.createElement('div');
-    row.className = 'prod-alloc-row';
-
-    const mkName = document.createElement('span');
-    mkName.className = 'prod-alloc-mk';
-    mkName.textContent = mk.name;
-    row.appendChild(mkName);
-
-    [['base', c.base, 'Base'], ['libre', c.libre, 'Libre'], ['asegurado', c.asegurado, 'Aseg']].forEach(([field, val, ph]) => {
-      const input = document.createElement('input');
-      input.type = 'number';
-      input.min = '0';
-      input.step = '1000';
-      input.className = 'alloc-input';
-      input.value = val || '';
-      input.placeholder = ph;
-      input.setAttribute('aria-label', `${ph} de ${name} en ${mk.name} (kg)`);
-      input.addEventListener('change', (e) => onAlloc(key, mk.slug, field, Math.max(0, Number(e.target.value) || 0)));
-      row.appendChild(input);
+  if (cap > 0) {
+    const a = allocateProduct(p, marketMetas, globalPct);
+    const grid = document.createElement('div');
+    grid.className = 'prod-breakdown';
+    marketMetas.filter((m) => m.meta > 0 || (p.ov && p.ov[m.slug] != null)).forEach((m) => {
+      const cell = a.byMarket[m.slug];
+      const row = document.createElement('div');
+      row.className = 'prod-bd-row';
+      row.innerHTML =
+        `<span class="prod-bd-mk">${m.name}${cell.locked ? ' <span class="row-meta">fijo</span>' : ''}</span>` +
+        `<span class="prod-bd-val">C ${fmtKg(cell.comprometido)} · L ${fmtKg(cell.libre)}</span>`;
+      const ovInput = document.createElement('input');
+      ovInput.type = 'number';
+      ovInput.min = '0'; ovInput.step = '1000';
+      ovInput.className = 'alloc-input prod-ov-input';
+      ovInput.value = p.ov && p.ov[m.slug] != null ? p.ov[m.slug] : '';
+      ovInput.placeholder = `auto ${Math.round(cell.total).toLocaleString('es-CO')}`;
+      ovInput.title = 'Override kg (vacío = automático por meta)';
+      ovInput.setAttribute('aria-label', `Override de ${name} en ${m.name} (kg)`);
+      ovInput.addEventListener('change', (e) => {
+        const raw = e.target.value;
+        onOverride(key, m.slug, raw === '' ? null : Math.max(0, Number(raw) || 0));
+      });
+      row.appendChild(ovInput);
+      grid.appendChild(row);
     });
-
-    const disp = document.createElement('span');
-    const over = c.libreDisp < 0;
-    disp.className = 'prod-alloc-disp' + (over ? ' is-over' : '');
-    disp.textContent = over ? `sobre ${fmtKg(-c.libreDisp)}` : `libre ${fmtKg(c.libreDisp)}`;
-    disp.title = over ? 'Asegurado excede lo Libre' : 'Libre disponible (Libre − Asegurado)';
-    row.appendChild(disp);
-
-    const rm = document.createElement('button');
-    rm.type = 'button';
-    rm.className = 'wh-remove wh-remove--inline';
-    rm.title = `Quitar ${mk.name}`;
-    rm.innerHTML = '<i data-lucide="x"></i>';
-    rm.addEventListener('click', () => onRemoveRegion(key, mk.slug));
-    row.appendChild(rm);
-
-    wrap.appendChild(row);
-  });
-
-  // Add-region chips (markets not yet allocated)
-  const available = markets.filter((mk) => !allocated[mk.slug]);
-  if (available.length) {
-    const add = document.createElement('div');
-    add.className = 'prod-add';
-    available.forEach((mk) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'prod-add-chip';
-      b.textContent = `+ ${mk.name}`;
-      b.addEventListener('click', () => onAddRegion(key, mk.slug));
-      add.appendChild(b);
-    });
-    wrap.appendChild(add);
+    if (a.unassigned > 0) {
+      const warn = document.createElement('div');
+      warn.className = 'prod-unassigned';
+      warn.textContent = `Sin asignar: ${fmtKg(a.unassigned)} (revisa metas u overrides)`;
+      grid.appendChild(warn);
+    }
+    wrap.appendChild(grid);
   }
 
   return wrap;
 }
 
-/** Cutoff ordinal within its campaign window. */
 function order(month, campaign) {
   return CAMPAIGNS[campaign].cutoffMonths.indexOf(mod12(month)) + 1;
 }
