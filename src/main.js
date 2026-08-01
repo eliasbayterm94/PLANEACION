@@ -2,10 +2,11 @@ import { regions } from './data/regions.js';
 import { markets } from './data/markets.js';
 import { defaultWarehouses, emptyWarehouseConfig } from './data/warehouses.js';
 import {
-  buildSchedules, CAMPAIGNS, YEAR, listWarehouses, warehouseLeadLookup,
+  buildSchedules, CAMPAIGNS, YEAR, listWarehouses, warehouseLeadLookup, emptyGoals,
 } from './model.js';
 import {
-  loadPlan, saveWarehouse, saveShipment, subscribeToPlan, isRemote, editor, setEditor,
+  loadPlan, saveWarehouse, saveShipment, saveGoals, GOALS_SLUG,
+  subscribeToPlan, isRemote, editor, setEditor,
 } from './store.js';
 import { renderMarket } from './views/market.js';
 import { renderConsolidado } from './views/consolidado.js';
@@ -13,14 +14,16 @@ import { renderProducts } from './views/products.js';
 import { renderCosechas } from './views/cosechas.js';
 import { renderRegionesEditor } from './views/regionesEditor.js';
 import { renderBodegas } from './views/bodegas.js';
+import { renderMetas } from './views/metas.js';
 
 const schedules = buildSchedules(regions);
 
 const state = {
   view: 'consolidado',
   editRegion: schedules[0]?.slug ?? null, // selected origin in the edit tab
-  shipments: {}, // { regionSlug: { goals: {wh: kg}, ship: {wh: {monthIdx: containers}} } }
+  shipments: {}, // { regionSlug: { warehouses: [wh], ship: {wh: {monthIdx: containers}} } }
   warehouses: {}, // { marketSlug: { primary, warehouses: [{name, lead}] } }
+  goals: emptyGoals(), // { regions: {slug: {community, mirc}}, countriesMIRC: {country: kg} }
   status: '',
 };
 
@@ -43,6 +46,7 @@ const GROUP_ICON = {
 
 const TABS = [
   { id: 'consolidado', label: 'Consolidado', group: 'Plan', icon: 'layout-dashboard' },
+  { id: 'metas', label: 'Metas', group: 'Plan', icon: 'target' },
   { id: 'cosechas', label: 'Cosechas', group: 'Origen', icon: 'eye' },
   { id: 'regiones', label: 'Editar regiones', group: 'Origen', icon: 'square-pen' },
   ...markets.map((m) => ({ id: `market:${m.slug}`, label: m.name, group: 'Destino' })),
@@ -71,8 +75,11 @@ function setStatus(kind, detail) {
 
 // --- Shipment mutations (origin allocation, per region/warehouse) ----------
 function regionCopy(slug) {
-  const cur = state.shipments[slug] || { goals: {}, ship: {} };
-  return { goals: { ...(cur.goals || {}) }, ship: { ...(cur.ship || {}) } };
+  const cur = state.shipments[slug] || { warehouses: [], ship: {} };
+  return {
+    warehouses: [...(cur.warehouses || [])],
+    ship: { ...(cur.ship || {}) },
+  };
 }
 
 function saveRegion(slug, value) {
@@ -81,32 +88,52 @@ function saveRegion(slug, value) {
   render();
 }
 
-function setGoal(slug, wh, kg) {
-  const v = regionCopy(slug);
-  v.goals[wh] = kg;
-  saveRegion(slug, v);
-}
-
 function setShip(slug, wh, month, containers) {
   const v = regionCopy(slug);
   const months = { ...(v.ship[wh] || {}) };
   if (containers > 0) months[month] = containers;
   else delete months[month];
   v.ship[wh] = months;
+  if (!v.warehouses.includes(wh)) v.warehouses.push(wh);
   saveRegion(slug, v);
 }
 
 function addWarehouse(slug, wh) {
   const v = regionCopy(slug);
-  if (v.goals[wh] == null && v.ship[wh] == null) v.goals[wh] = 0;
+  if (!v.warehouses.includes(wh)) v.warehouses.push(wh);
   saveRegion(slug, v);
 }
 
 function removeWarehouse(slug, wh) {
   const v = regionCopy(slug);
-  delete v.goals[wh];
+  v.warehouses = v.warehouses.filter((w) => w !== wh);
   delete v.ship[wh];
   saveRegion(slug, v);
+}
+
+// --- Goal mutations (kg targets by category + country MIRC) ----------------
+function saveGoalsState(value) {
+  state.goals = value;
+  saveGoals(value, setStatus);
+  render();
+}
+
+function setRegionGoal(slug, category, kg) {
+  const g = {
+    regions: { ...(state.goals.regions || {}) },
+    countriesMIRC: { ...(state.goals.countriesMIRC || {}) },
+  };
+  g.regions[slug] = { ...(g.regions[slug] || {}), [category]: kg };
+  saveGoalsState(g);
+}
+
+function setCountryMirc(country, kg) {
+  const g = {
+    regions: { ...(state.goals.regions || {}) },
+    countriesMIRC: { ...(state.goals.countriesMIRC || {}) },
+  };
+  g.countriesMIRC[country] = kg;
+  saveGoalsState(g);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,6 +192,15 @@ function renderView() {
       shipments: state.shipments,
       leadLookup,
     }));
+  } else if (kind === 'metas') {
+    root.appendChild(renderMetas({
+      schedules,
+      goals: state.goals,
+      shipments: state.shipments,
+      leadLookup,
+      onRegionGoal: (slug, category, kg) => setRegionGoal(slug, category, kg),
+      onCountryMirc: (country, kg) => setCountryMirc(country, kg),
+    }));
   } else if (kind === 'cosechas') {
     root.appendChild(renderCosechas({
       schedules,
@@ -176,10 +212,10 @@ function renderView() {
       schedules,
       selectedSlug: slug,
       onSelect: (s) => { state.editRegion = s; render(); },
-      shipment: state.shipments[slug] || { goals: {}, ship: {} },
+      shipment: state.shipments[slug] || { warehouses: [], ship: {} },
+      goal: state.goals.regions?.[slug] || {},
       allWarehouses,
       leadLookup,
-      onGoal: (wh, kg) => setGoal(slug, wh, kg),
       onShip: (wh, month, containers) => setShip(slug, wh, month, containers),
       onAddWarehouse: (wh) => addWarehouse(slug, wh),
       onRemoveWarehouse: (wh) => removeWarehouse(slug, wh),
@@ -246,9 +282,10 @@ async function init() {
   const fromHash = location.hash.slice(1);
   if (fromHash && TABS.some((t) => t.id === fromHash)) state.view = fromHash;
 
-  const { warehouse, shipment, error } = await loadPlan();
+  const { warehouse, shipment, goals, error } = await loadPlan();
   state.warehouses = buildWarehouses(warehouse);
   state.shipments = shipment || {};
+  state.goals = goals?.[GOALS_SLUG] || emptyGoals();
   if (error) setStatus('error', error);
 
   render();
@@ -256,6 +293,7 @@ async function init() {
   subscribeToPlan((scope, slug, value) => {
     if (scope === 'warehouse') state.warehouses[slug] = value;
     else if (scope === 'shipment') state.shipments[slug] = value;
+    else if (scope === 'goals') state.goals = value;
     else return; // legacy region/market scopes are no longer rendered
     render();
   });

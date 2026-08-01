@@ -244,6 +244,97 @@
 }
 .wh-select:focus { outline: none; border-color: var(--fc-navy); }
 
+/* --- Metas (kg goals by category + country MIRC target) ----------------- */
+.metas-country-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 14px;
+}
+.metas-target { display: inline-flex; align-items: center; gap: 8px; }
+.metas-target span {
+  font-family: var(--fc-font-display);
+  font-size: 9px;
+  font-weight: var(--fc-fw-bold);
+  letter-spacing: var(--fc-ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--fc-ink-500);
+}
+.metas-target input {
+  width: 120px;
+  font-family: var(--fc-font-mono);
+  font-size: var(--fc-fs-12);
+  color: var(--fc-navy);
+  background: #fff;
+  border: 1px solid var(--fc-ink-100);
+  border-radius: var(--fc-radius-2);
+  padding: 6px 8px;
+  text-align: right;
+}
+.metas-target input:focus { outline: none; border-color: var(--fc-navy); }
+.metas-rollup {
+  font-family: var(--fc-font-body);
+  font-size: var(--fc-fs-12);
+  color: var(--fc-ink-500);
+  margin-left: auto;
+}
+.metas-rollup .tally { font-family: var(--fc-font-mono); }
+
+.metas-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.4fr) 1fr 1fr 110px 110px;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+}
+.metas-row--head span {
+  font-family: var(--fc-font-display);
+  font-size: 9px;
+  font-weight: var(--fc-fw-bold);
+  letter-spacing: var(--fc-ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--fc-ink-500);
+}
+.metas-region {
+  font-family: var(--fc-font-body);
+  font-size: var(--fc-fs-14);
+  font-weight: var(--fc-fw-medium);
+  color: var(--fc-navy);
+}
+.metas-input {
+  font-family: var(--fc-font-mono);
+  font-size: var(--fc-fs-12);
+  color: var(--fc-navy);
+  background: #fff;
+  border: 1px solid var(--fc-ink-100);
+  border-radius: var(--fc-radius-2);
+  padding: 7px 8px;
+  text-align: right;
+  width: 100%;
+}
+.metas-input:focus { outline: none; border-color: var(--fc-navy); }
+.metas-total, .metas-salidas {
+  font-family: var(--fc-font-mono);
+  font-size: var(--fc-fs-12);
+  text-align: right;
+}
+.metas-total { color: var(--fc-navy); font-weight: var(--fc-fw-semibold); }
+.metas-salidas { color: var(--fc-ink-500); }
+.metas-foot {
+  margin-top: 12px;
+  font-family: var(--fc-font-body);
+  font-size: var(--fc-fs-12);
+  color: var(--fc-ink-500);
+}
+.metas-foot strong { color: var(--fc-navy); font-family: var(--fc-font-mono); }
+
+@media (max-width: 767px) {
+  .metas-row { grid-template-columns: 1fr 1fr; }
+  .metas-row--head { display: none; }
+  .metas-region { grid-column: 1 / -1; font-weight: var(--fc-fw-semibold); }
+}
+
 /* --- Calendar grid ------------------------------------------------------ */
 .grid {
   display: grid;

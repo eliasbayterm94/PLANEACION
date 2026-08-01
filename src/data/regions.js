@@ -10,30 +10,36 @@
  * Colours are light tints from the Forest design system closed palette so cells
  * stay legible with dark ink text. Region identity is carried by the row label;
  * colour is a secondary distinguisher only.
+ *
+ * `country` groups regions for the country-level MIRC goal (Metas tab).
  */
 
 export const regions = [
   {
     slug: 'tolima-traviesa',
     name: 'Tolima (traviesa)',
+    country: 'Colombia',
     color: '#e7e244', // yellow
     cosecha: [4, 5, 6], // May, Jun, Jul
   },
   {
     slug: 'huila-norte',
     name: 'Huila Norte',
+    country: 'Colombia',
     color: '#c7d8e6', // blue-200
     cosecha: [4, 5, 6],
   },
   {
     slug: 'narino',
     name: 'Nariño',
+    country: 'Colombia',
     color: '#95b5ce', // blue
     cosecha: [4, 5, 6, 7], // May–Ago
   },
   {
     slug: 'rwanda',
     name: 'Rwanda',
+    country: 'Rwanda',
     color: '#c9c422', // yellow-600
     cosecha: [2, 3, 4, 5], // Mar–Jun
     corteMode: 'single',   // one cutoff once the harvest closes, not a wave per month
@@ -42,12 +48,14 @@ export const regions = [
   {
     slug: 'huila-sur',
     name: 'Huila Sur',
+    country: 'Colombia',
     color: '#f5f08a', // yellow-200
     cosecha: [7, 8, 9, 10, 11], // Ago–Dic
   },
   {
     slug: 'tolima-full',
     name: 'Tolima Full',
+    country: 'Colombia',
     color: '#e6eef5', // blue-100
     cosecha: [9, 10], // Oct, Nov
   },

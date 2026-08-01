@@ -1,24 +1,23 @@
 import {
   MONTHS, monthName, primaryCampaign, CAMPAIGNS, CUTOFF_DAY,
-  shipmentArrival, warehouseAllocated, containersToKg, kgToContainers,
-  KG_PER_CONTAINER,
+  shipmentArrival, regionShipmentSummary, containersToKg, kgToContainers,
 } from '../model.js';
 
 /**
  * Editar regiones — the real salidas plan, per region.
  *
- * Pick a region, then allocate containers per warehouse per month (salidas).
- * The landing row (llegadas) is derived from each warehouse's lead time, so both
- * departure and arrival are visible. Each region+warehouse carries a goal in kg;
- * progress is shown in containers and kg (1 container = KG_PER_CONTAINER kg).
+ * Pick a region, add the warehouses it ships to, and allocate containers per
+ * warehouse per month (salidas). The landing row (llegadas) is derived from each
+ * warehouse's lead time. Goals now live in the Metas tab (kg, by category); the
+ * header here shows salidas vs the region's total goal for context.
  *
- * This is independent of the cosecha calendar (informational only). The region's
- * derived cutoff months are shown as reference markers, nothing more.
+ * Independent of the cosecha calendar (informational only). The region's derived
+ * cutoff months are shown as reference markers, nothing more.
  */
 export function renderRegionesEditor({
   schedules, selectedSlug, onSelect,
-  shipment, allWarehouses, leadLookup,
-  onGoal, onShip, onAddWarehouse, onRemoveWarehouse,
+  shipment, goal, allWarehouses, leadLookup,
+  onShip, onAddWarehouse, onRemoveWarehouse,
 }) {
   const el = document.createElement('div');
 
@@ -37,15 +36,14 @@ export function renderRegionesEditor({
   el.appendChild(pills);
 
   const schedule = schedules.find((s) => s.slug === selectedSlug) || schedules[0];
-  const cfg = shipment || { goals: {}, ship: {} };
+  const cfg = shipment || { warehouses: [], ship: {} };
 
-  // Which warehouses this region ships to (has a goal or an allocation).
   const added = orderWarehouses(
-    [...new Set([...Object.keys(cfg.goals || {}), ...Object.keys(cfg.ship || {})])],
+    [...new Set([...(cfg.warehouses || []), ...Object.keys(cfg.ship || {})])],
     allWarehouses,
   );
 
-  el.appendChild(header(schedule, cfg, added, leadLookup));
+  el.appendChild(header(schedule, cfg, leadLookup, goal));
 
   if (!added.length) {
     const empty = document.createElement('p');
@@ -53,39 +51,38 @@ export function renderRegionesEditor({
     empty.textContent = 'Esta región aún no envía a ninguna bodega. Agrega una abajo.';
     el.appendChild(empty);
   } else {
-    el.appendChild(grid(schedule, cfg, added, leadLookup, onGoal, onShip, onRemoveWarehouse));
+    el.appendChild(grid(schedule, cfg, added, leadLookup, onShip, onRemoveWarehouse));
   }
 
-  el.appendChild(addBar(selectedSlug, added, allWarehouses, onAddWarehouse));
+  el.appendChild(addBar(added, allWarehouses, onAddWarehouse));
   return el;
 }
 
-function header(s, cfg, added, leadLookup) {
+function header(s, cfg, leadLookup, goal) {
   const wrap = document.createElement('div');
   wrap.className = 'view-head';
   const camp = primaryCampaign(s);
-  let allocated = 0;
-  let goalKg = 0;
-  added.forEach((wh) => {
-    allocated += warehouseAllocated(cfg, wh);
-    goalKg += Number(cfg.goals?.[wh]) || 0;
-  });
+  const { allocated } = regionShipmentSummary(cfg, leadLookup);
   const allocKg = containersToKg(allocated);
+  const goalKg = (Number(goal?.community) || 0) + (Number(goal?.mirc) || 0);
   const goalCont = kgToContainers(goalKg);
   const pct = goalKg ? Math.round((allocKg / goalKg) * 100) : 0;
+  const metaNote = goalKg
+    ? `Meta <strong>${fmtKg(goalKg)}</strong> (${goalCont.toFixed(1)} cont) · ` +
+      `<strong class="tally tally--${allocKg > goalKg ? 'over' : pct === 100 ? 'exact' : 'under'}">${pct}%</strong> · `
+    : 'Sin meta (defínela en <strong>Metas</strong>) · ';
   wrap.innerHTML = `
     <h2>${s.name}</h2>
     <p class="view-sub">
       ${CAMPAIGNS[camp]?.name ?? 'Sin campaña'} ·
       Salidas <strong>${allocated}</strong> cont (${fmtKg(allocKg)}) ·
-      Meta <strong>${fmtKg(goalKg)}</strong> (${goalCont ? goalCont.toFixed(1) : 0} cont) ·
-      <strong class="tally tally--${goalKg && allocKg > goalKg ? 'over' : pct === 100 ? 'exact' : 'under'}">${pct}%</strong> ·
+      ${metaNote}
       Cortes (ref.) el día ${CUTOFF_DAY}
     </p>`;
   return wrap;
 }
 
-function grid(s, cfg, added, leadLookup, onGoal, onShip, onRemoveWarehouse) {
+function grid(s, cfg, added, leadLookup, onShip, onRemoveWarehouse) {
   const g = document.createElement('div');
   g.className = 'grid grid--region';
 
@@ -101,12 +98,8 @@ function grid(s, cfg, added, leadLookup, onGoal, onShip, onRemoveWarehouse) {
 
   added.forEach((wh) => {
     const info = leadLookup[wh] || { lead: 1, market: '' };
-    const allocated = warehouseAllocated(cfg, wh);
-    const goalKg = Number(cfg.goals?.[wh]) || 0;
-    const allocKg = containersToKg(allocated);
-    const pct = goalKg ? Math.round((allocKg / goalKg) * 100) : 0;
 
-    // Group label: warehouse + market + lead + goal input + progress + remove.
+    // Group label: warehouse + market + lead + remove.
     const gl = document.createElement('div');
     gl.className = 'group-label wh-group';
     const meta = document.createElement('div');
@@ -114,30 +107,13 @@ function grid(s, cfg, added, leadLookup, onGoal, onShip, onRemoveWarehouse) {
     meta.innerHTML =
       `<span class="wh-group-name">${wh}</span>` +
       `<span class="wh-group-meta">${info.marketName || info.market} · lead ${leadLabel(info.lead)}</span>`;
-    const goalWrap = document.createElement('label');
-    goalWrap.className = 'wh-goal';
-    goalWrap.innerHTML = '<span>Meta kg</span>';
-    const goalInput = document.createElement('input');
-    goalInput.type = 'number';
-    goalInput.min = '0';
-    goalInput.step = '1000';
-    goalInput.value = goalKg || '';
-    goalInput.placeholder = '0';
-    goalInput.setAttribute('aria-label', `Meta en kg para ${wh}`);
-    goalInput.addEventListener('change', (e) => onGoal(wh, Math.max(0, Number(e.target.value) || 0)));
-    goalWrap.appendChild(goalInput);
-    const prog = document.createElement('span');
-    prog.className = 'wh-progress';
-    prog.textContent = goalKg ? `${allocated} cont · ${pct}%` : `${allocated} cont`;
     const rm = document.createElement('button');
     rm.type = 'button';
     rm.className = 'wh-remove wh-remove--inline';
+    rm.style.marginLeft = 'auto';
     rm.title = `Quitar ${wh} de ${s.name}`;
     rm.innerHTML = '<i data-lucide="x"></i>';
     rm.addEventListener('click', () => onRemoveWarehouse(wh));
-
-    meta.appendChild(goalWrap);
-    meta.appendChild(prog);
     meta.appendChild(rm);
     gl.appendChild(meta);
     g.appendChild(gl);
@@ -188,7 +164,7 @@ function grid(s, cfg, added, leadLookup, onGoal, onShip, onRemoveWarehouse) {
   return g;
 }
 
-function addBar(regionSlug, added, allWarehouses, onAddWarehouse) {
+function addBar(added, allWarehouses, onAddWarehouse) {
   const wrap = document.createElement('div');
   wrap.className = 'wh-addbar';
 
@@ -207,7 +183,6 @@ function addBar(regionSlug, added, allWarehouses, onAddWarehouse) {
     ph.value = '';
     ph.textContent = 'Elegir bodega…';
     select.appendChild(ph);
-    // Group by market
     const byMarket = {};
     available.forEach((w) => { (byMarket[w.marketName] ||= []).push(w); });
     Object.entries(byMarket).forEach(([mkName, list]) => {

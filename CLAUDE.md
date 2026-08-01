@@ -90,6 +90,18 @@ Persisted per region as scope `shipment`, one row each:
 Shipments are **independent of the cosecha calendar**. The derived cutoff months
 are shown as reference markers only; the **Cosechas** Gantt is informational.
 
+### Goals (Metas tab)
+
+Goals are kg targets, edited in the **Metas** tab, not inline with shipments.
+Two macro categories per region: **Community** and **MIRC**. MIRC additionally
+rolls up to a **country-level target** (`region.country`; today Colombia and
+Rwanda); Community is demand-driven and has no country target. Persisted as a
+single row, scope `goals`, slug `plan`:
+`{ regions: { slug: { community, mirc } }, countriesMIRC: { country: kg } }`.
+Salidas are not yet split by category, so progress shows total salidas (kg) vs a
+region's total goal, and the country card compares planned MIRC (sum of region
+MIRC goals) against the country target.
+
 ---
 
 ## Architecture
@@ -99,12 +111,13 @@ src/
   model.js           offsets, derivation, reconciliation — the core
   store.js           Supabase persistence + localStorage fallback + CSV
   data/
-    regions.js       harvest declarations only
+    regions.js       harvest declarations + country (for the MIRC goal rollup)
     markets.js       targets and transit delays
     warehouses.js    destination warehouses + lead times (seed defaults)
     products.js      catalogue keyed by cutoff month
   views/
     consolidado.js   supply vs demand reconciliation
+    metas.js         kg goals by category + country MIRC target ("Metas" tab)
     cosechas.js      read-only overview of every origin at once ("Cosechas" tab)
     regionesEditor.js  region picker + editable grid ("Editar regiones" tab)
     region.js        per-origin grid (used by regionesEditor)

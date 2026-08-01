@@ -224,6 +224,42 @@ export const containersToKg = (c) => (Number(c) || 0) * KG_PER_CONTAINER;
 export const kgToContainers = (kg) => (Number(kg) || 0) / KG_PER_CONTAINER;
 
 // ---------------------------------------------------------------------------
+// Goals — kg targets by category, and the country-level MIRC target
+// ---------------------------------------------------------------------------
+/** The two macro categories every region goal is split into. */
+export const GOAL_CATEGORIES = [
+  { key: 'community', name: 'Community' },
+  { key: 'mirc', name: 'MIRC' },
+];
+
+/** Goals shape: { regions: { slug: { community, mirc } }, countriesMIRC: { country: kg } } */
+export const emptyGoals = () => ({ regions: {}, countriesMIRC: {} });
+
+/** Distinct countries, in declaration order. */
+export function listCountries(regions = []) {
+  const seen = [];
+  regions.forEach((r) => { if (r.country && !seen.includes(r.country)) seen.push(r.country); });
+  return seen;
+}
+
+/** kg for a region in one category. */
+export function regionGoal(goals, slug, category) {
+  return Number(goals?.regions?.[slug]?.[category]) || 0;
+}
+
+/** Total kg goal (community + mirc) for a region. */
+export function regionGoalTotal(goals, slug) {
+  return regionGoal(goals, slug, 'community') + regionGoal(goals, slug, 'mirc');
+}
+
+/** Sum of a category's region goals for one country. */
+export function countryPlanned(goals, regions, country, category) {
+  return regions
+    .filter((r) => r.country === country)
+    .reduce((sum, r) => sum + regionGoal(goals, r.slug, category), 0);
+}
+
+// ---------------------------------------------------------------------------
 // Market chains
 // ---------------------------------------------------------------------------
 /**
