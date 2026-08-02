@@ -383,6 +383,8 @@ function renderView() {
       warehouses: state.warehouses,
       goals: state.goals,
       shipments: state.shipments,
+      catalog: state.catalog,
+      alloc: state.alloc,
       leadLookup,
       onMarketGoal: (slug, category, kg) => setMarketGoal(slug, category, kg),
       onWarehouseGoal: (wh, category, kg) => setWarehouseGoal(wh, category, kg),

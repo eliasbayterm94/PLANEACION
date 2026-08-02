@@ -17,19 +17,29 @@ import {
  * split by category.
  */
 export function renderMetas({
-  schedules, markets, warehouses, goals, shipments, leadLookup,
+  schedules, markets, warehouses, goals, shipments, leadLookup, catalog, alloc,
   onMarketGoal, onWarehouseGoal, onCountryMirc, onCompanyGoal,
 }) {
   const el = document.createElement('div');
   el.appendChild(header());
-  el.appendChild(companyCard(markets, warehouses, goals, onCompanyGoal));
+  el.appendChild(companyCard(markets, warehouses, goals, catalog, alloc, onCompanyGoal));
   el.appendChild(marketCard(markets, warehouses, goals, shipments, leadLookup, onMarketGoal, onWarehouseGoal));
   el.appendChild(countryCard(schedules, goals, shipments, leadLookup, onCountryMirc));
   return el;
 }
 
+/** Capacity (kg) loaded on products of a macro category (mirc/community). */
+function capacityByMacro(catalog, alloc, macro) {
+  const macroByCat = {};
+  (catalog?.categories || []).forEach((c) => { macroByCat[c.key] = c.macro; });
+  return (catalog?.products || []).reduce((s, p) => {
+    if (macroByCat[p.category] === macro) return s + (Number(alloc?.products?.[p.id]?.cap) || 0);
+    return s;
+  }, 0);
+}
+
 /** Company-level general goal (Community + MIRC), reconciled with the breakdowns. */
-function companyCard(markets, warehouses, goals, onCompanyGoal) {
+function companyCard(markets, warehouses, goals, catalog, alloc, onCompanyGoal) {
   const card = document.createElement('section');
   card.className = 'wh-card';
 
@@ -76,6 +86,7 @@ function companyCard(markets, warehouses, goals, onCompanyGoal) {
     if (cat === 'mirc') {
       recon.appendChild(chip('Países', companyCountryMirc(goals), company));
     }
+    recon.appendChild(chip('Capacidad', capacityByMacro(catalog, alloc, cat), company));
     row.appendChild(recon);
 
     card.appendChild(row);
