@@ -400,9 +400,9 @@ function productsSection(catalog, cb) {
     reset.type = 'button';
     reset.className = 'fc-btn fc-btn-ghost prod-reset';
     reset.innerHTML = '<i data-lucide="rotate-ccw"></i> Cargar catálogo base';
-    reset.title = 'Reemplaza categorías, cortes, pools y productos con la lista base';
+    reset.title = 'Reemplaza categorías, cortes, pools, productos y capacidades con la lista base';
     reset.addEventListener('click', () => {
-      if (window.confirm('¿Reemplazar todo el catálogo (categorías, cortes, pools y productos) con la lista base? Esto borra los productos actuales.')) {
+      if (window.confirm('¿Reemplazar todo el catálogo (categorías, cortes, pools, productos) y cargar las capacidades por producto con la lista base? Esto borra los productos actuales.')) {
         onResetCatalog();
       }
     });

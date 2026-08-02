@@ -44,83 +44,86 @@ export const defaultPools = [
 
 /**
  * 2027 release list from the planning sheet (see the two campaign photos).
- * Rows: [name, category, startCorte (month index), pool id].
+ * Rows: [name, category, startCorte (month index), pool id, kg].
+ * `kg` is the product's planned volume from the sheet, seeded as its Capacidad
+ * (scope `alloc`). Pool members show 0 — the sheet only gives the pool's
+ * combined kg (its meta), not a per-member split.
  * Campaña 2 (principal) cortes: primer=Oct(9), segundo=Nov(10), tercer=Dic(11), cuarto=Ene(0).
  * Campaña 1 (mitaca) cortes: primer=Jun(5), segundo=Jul(6), tercer=Ago(7), cuarto=Sep(8).
  */
 const seedRows = [
   // ---- Campaña 2 — cosecha principal (Autumn / Christmas), ~300.000 kg ------
   // Microlots
-  ['Guava Banana', 'microlot', 9, ''],
-  ['Natural Guamo', 'microlot', 9, ''],
-  ['Pink Volcano', 'microlot', 9, ''],
-  ['Pink Borbon Punch', 'microlot', 10, ''],
-  ['Wush Wush Vergel', 'microlot', 10, ''],
-  ['Pink Honey', 'microlot', 10, ''],
-  ['Honey Mountain', 'microlot', 11, ''],
-  ['Papayo Paradise', 'microlot', 11, ''],
-  ['Decaf Natural', 'microlot', 11, ''],
-  ['Vergel Temp Natural BF8', 'microlot', 11, ''],
-  ['Vergel Washed Mosto Anaerobic', 'microlot', 11, ''],
-  ['Vergel River Natural BF1', 'microlot', 11, ''],
-  ['Vergel Natural Anaerobic Twist', 'microlot', 11, ''],
+  ['Guava Banana', 'microlot', 9, '', 40000],
+  ['Natural Guamo', 'microlot', 9, '', 12180],
+  ['Pink Volcano', 'microlot', 9, '', 5500],
+  ['Pink Borbon Punch', 'microlot', 10, '', 2800],
+  ['Wush Wush Vergel', 'microlot', 10, '', 1200],
+  ['Pink Honey', 'microlot', 10, '', 2500],
+  ['Honey Mountain', 'microlot', 11, '', 5000],
+  ['Papayo Paradise', 'microlot', 11, '', 2000],
+  ['Decaf Natural', 'microlot', 11, '', 12180],
+  ['Vergel Temp Natural BF8', 'microlot', 11, '', 5500],
+  ['Vergel Washed Mosto Anaerobic', 'microlot', 11, '', 5500],
+  ['Vergel River Natural BF1', 'microlot', 11, '', 5500],
+  ['Vergel Natural Anaerobic Twist', 'microlot', 11, '', 5500],
   // Reserve
-  ['Papayo Jungle', 'reserve', 0, ''],
-  ['Vergel Reserve', 'reserve', 0, ''],
+  ['Papayo Jungle', 'reserve', 0, '', 1200],
+  ['Vergel Reserve', 'reserve', 0, '', 1200],
   // Innovation (sueltos)
-  ['Guava Koji', 'innovation', 0, ''],
-  ['Sidra Koji', 'innovation', 0, ''],
-  ['Rocket Flower', 'innovation', 0, ''],
-  ['Magnum Sidra', 'innovation', 0, ''],
-  // Innovation — Pool Campaña 2 / principal (meta combinada 184.420 kg)
-  ['Vanilla Heaven', 'innovation', 11, POOL_PRINCIPAL],
-  ['Cinnamon', 'innovation', 0, POOL_PRINCIPAL],
-  ['Christmas #1 Special Edition', 'innovation', 0, POOL_PRINCIPAL],
-  ['Christmas #2 Special Edition', 'innovation', 0, POOL_PRINCIPAL],
-  ['Sunrise Pocket', 'innovation', 0, POOL_PRINCIPAL],
-  ['Galactic Crumble', 'innovation', 9, POOL_PRINCIPAL],
-  ['Apple Explosion', 'innovation', 9, POOL_PRINCIPAL],
-  ['Juicy Strawberry', 'innovation', 9, POOL_PRINCIPAL],
-  ['Juicy Grape', 'innovation', 9, POOL_PRINCIPAL],
-  ['NEW CRAZY INFUSED', 'innovation', 11, POOL_PRINCIPAL],
+  ['Guava Koji', 'innovation', 0, '', 1450],
+  ['Sidra Koji', 'innovation', 0, '', 1450],
+  ['Rocket Flower', 'innovation', 0, '', 3000],
+  ['Magnum Sidra', 'innovation', 0, '', 720],
+  // Innovation — Pool Campaña 2 / principal (meta combinada 184.420 kg; sin kg por producto)
+  ['Vanilla Heaven', 'innovation', 11, POOL_PRINCIPAL, 0],
+  ['Cinnamon', 'innovation', 0, POOL_PRINCIPAL, 0],
+  ['Christmas #1 Special Edition', 'innovation', 0, POOL_PRINCIPAL, 0],
+  ['Christmas #2 Special Edition', 'innovation', 0, POOL_PRINCIPAL, 0],
+  ['Sunrise Pocket', 'innovation', 0, POOL_PRINCIPAL, 0],
+  ['Galactic Crumble', 'innovation', 9, POOL_PRINCIPAL, 0],
+  ['Apple Explosion', 'innovation', 9, POOL_PRINCIPAL, 0],
+  ['Juicy Strawberry', 'innovation', 9, POOL_PRINCIPAL, 0],
+  ['Juicy Grape', 'innovation', 9, POOL_PRINCIPAL, 0],
+  ['NEW CRAZY INFUSED', 'innovation', 11, POOL_PRINCIPAL, 0],
 
   // ---- Campaña 1 — mitaca (Spring / Summer), ~200.000 kg -------------------
   // Microlots
-  ['Bubble Gum', 'microlot', 5, ''],
-  ['Decaf Natural', 'microlot', 5, ''],
-  ['Guava Banana', 'microlot', 5, ''],
-  ['Papayo Vergel Honey', 'microlot', 6, ''],
-  ['Papayo Vergel Natural Nuevo', 'microlot', 6, ''],
-  ['Typica Lavado / Varietal Lavado', 'microlot', 6, ''],
-  ['Wild Caturron', 'microlot', 7, ''],
-  ['Pink Borbon Creation', 'microlot', 7, ''],
-  ['Gesha Willow', 'microlot', 7, ''],
-  ['Chiroso San Carlos', 'microlot', 8, ''],
-  ['Chiroso Carmen Montoya', 'microlot', 8, ''],
-  ['Chiroso Honey', 'microlot', 8, ''],
-  ['Chiroso Natural', 'microlot', 8, ''],
-  ['Ceiba Honey', 'microlot', 8, ''],
-  ['Vergel Cold Temp Natural BF7', 'microlot', 8, ''],
-  ['Vergel Dual Temp Natural', 'microlot', 8, ''],
-  ['Vergel Honey Anaerobic Twist', 'microlot', 8, ''],
-  ['Vergel Washed Anaerobic Twist', 'microlot', 8, ''],
+  ['Bubble Gum', 'microlot', 5, '', 5000],
+  ['Decaf Natural', 'microlot', 5, '', 12180],
+  ['Guava Banana', 'microlot', 5, '', 30000],
+  ['Papayo Vergel Honey', 'microlot', 6, '', 2000],
+  ['Papayo Vergel Natural Nuevo', 'microlot', 6, '', 2000],
+  ['Typica Lavado / Varietal Lavado', 'microlot', 6, '', 2000],
+  ['Wild Caturron', 'microlot', 7, '', 1200],
+  ['Pink Borbon Creation', 'microlot', 7, '', 5000],
+  ['Gesha Willow', 'microlot', 7, '', 1800],
+  ['Chiroso San Carlos', 'microlot', 8, '', 3000],
+  ['Chiroso Carmen Montoya', 'microlot', 8, '', 1200],
+  ['Chiroso Honey', 'microlot', 8, '', 2000],
+  ['Chiroso Natural', 'microlot', 8, '', 2000],
+  ['Ceiba Honey', 'microlot', 8, '', 2000],
+  ['Vergel Cold Temp Natural BF7', 'microlot', 8, '', 5000],
+  ['Vergel Dual Temp Natural', 'microlot', 8, '', 5000],
+  ['Vergel Honey Anaerobic Twist', 'microlot', 8, '', 5000],
+  ['Vergel Washed Anaerobic Twist', 'microlot', 8, '', 5000],
   // Innovation (sueltos)
-  ['Pink Koji', 'innovation', 7, ''],
-  ['Java Koji', 'innovation', 7, ''],
-  // Reserve (corte en blanco en la hoja → primer corte por defecto)
-  ['Vergel Reserve', 'reserve', 5, ''],
+  ['Pink Koji', 'innovation', 7, '', 1200],
+  ['Java Koji', 'innovation', 7, '', 1200],
+  // Reserve (corte y kg en blanco en la hoja → primer corte, sin capacidad)
+  ['Vergel Reserve', 'reserve', 5, '', 0],
   // Innovation — Pool Campaña 1 / mitaca (meta combinada 106.220 kg; cortes en blanco → primer corte)
-  ['Red Symphony', 'innovation', 5, POOL_MITACA],
-  ['Juicy Grape', 'innovation', 5, POOL_MITACA],
-  ['Juicy Passion Fruit', 'innovation', 5, POOL_MITACA],
-  ['Juicy Strawberry', 'innovation', 5, POOL_MITACA],
-  ['Tropical Splash', 'innovation', 5, POOL_MITACA],
-  ['Kiwilu', 'innovation', 5, POOL_MITACA],
-  ['Vergel Flowers', 'innovation', 6, POOL_MITACA],
-  ['Galactic Crumble', 'innovation', 5, POOL_MITACA],
-  ['Candy Blast', 'innovation', 5, POOL_MITACA],
-  ['Sumer Waves', 'innovation', 5, POOL_MITACA],
-  ['Pinneapple Ride', 'innovation', 5, POOL_MITACA],
+  ['Red Symphony', 'innovation', 5, POOL_MITACA, 0],
+  ['Juicy Grape', 'innovation', 5, POOL_MITACA, 0],
+  ['Juicy Passion Fruit', 'innovation', 5, POOL_MITACA, 0],
+  ['Juicy Strawberry', 'innovation', 5, POOL_MITACA, 0],
+  ['Tropical Splash', 'innovation', 5, POOL_MITACA, 0],
+  ['Kiwilu', 'innovation', 5, POOL_MITACA, 0],
+  ['Vergel Flowers', 'innovation', 6, POOL_MITACA, 0],
+  ['Galactic Crumble', 'innovation', 5, POOL_MITACA, 0],
+  ['Candy Blast', 'innovation', 5, POOL_MITACA, 0],
+  ['Sumer Waves', 'innovation', 5, POOL_MITACA, 0],
+  ['Pinneapple Ride', 'innovation', 5, POOL_MITACA, 0],
 ];
 
 /** Products flattened from the release list; id = `${startCorte}::${name}`. */
@@ -131,6 +134,13 @@ export const defaultProducts = seedRows.map(([name, category, startCorte, pool])
   pool,
   startCorte,
 }));
+
+/** Seed Capacidad (kg) per product id, from the sheet's kg column (>0 only). */
+export const defaultCapacities = Object.fromEntries(
+  seedRows
+    .filter(([, , , , kg]) => Number(kg) > 0)
+    .map(([name, , startCorte, , kg]) => [`${startCorte}::${name}`, Number(kg)]),
+);
 
 export const emptyCatalog = () => ({
   categories: defaultCategories.map((c) => ({ ...c })),

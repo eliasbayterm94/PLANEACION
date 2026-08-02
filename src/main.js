@@ -1,7 +1,7 @@
 import { regions } from './data/regions.js';
 import { markets } from './data/markets.js';
 import { defaultWarehouses, emptyWarehouseConfig } from './data/warehouses.js';
-import { emptyCatalog } from './data/catalog.js';
+import { emptyCatalog, defaultCapacities } from './data/catalog.js';
 import {
   buildSchedules, CAMPAIGNS, YEAR, warehouseLeadLookup, emptyGoals,
   DEFAULT_COMPROMETIDO_PCT, setCampaignCortes,
@@ -349,9 +349,22 @@ function prodRemove(id) {
   saveCatalogState(c, false);
 }
 
-/** Replace the whole catalogue (categories, cortes, pools, products) with the seed. */
+/**
+ * Replace the whole catalogue (categories, cortes, pools, products) with the
+ * seed, and seed each product's Capacidad (kg) from the release list. Keeps the
+ * global comprometido %; clears per-product overrides and pool allocations.
+ */
 function resetCatalogToSeed() {
   state.prodSel = new Set();
+  const products = {};
+  Object.entries(defaultCapacities).forEach(([id, kg]) => {
+    products[id] = { cap: kg, pct: null, ov: {} };
+  });
+  saveAllocState({
+    pctComprometido: state.alloc?.pctComprometido ?? DEFAULT_COMPROMETIDO_PCT,
+    products,
+    pools: {},
+  });
   saveCatalogState(normalizeCatalog(emptyCatalog()), true);
 }
 
