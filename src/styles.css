@@ -4,7 +4,7 @@
    planning calendar and its cards, restyled to the Forest light theme.
 
    Palette is closed (design system rule 6): yellow / blue / navy / ink / paper.
-   Campaña 1 (main crop) = yellow, Campaña 2 (mitaca) = blue. */
+   Campaña 2 (principal) = yellow, Campaña 1 (mitaca) = blue, Campaña Rwanda = navy. */
 
 /* --- Sidebar footer: editor + mode (on navy) --------------------------- */
 .fp-editor-field {
@@ -385,8 +385,9 @@
 .prog-country { margin-top: var(--fc-space-4); margin-bottom: 0; }
 
 /* Campaign band on the month header */
-.month-head--c1 { box-shadow: inset 0 -3px 0 var(--fc-yellow); }
-.month-head--c2 { box-shadow: inset 0 -3px 0 var(--fc-blue); }
+.month-head--c1 { box-shadow: inset 0 -3px 0 var(--fc-blue); }
+.month-head--c2 { box-shadow: inset 0 -3px 0 var(--fc-yellow); }
+.month-head--c3 { box-shadow: inset 0 -3px 0 var(--fc-navy); }
 
 /* Export-capacity row (valle signal) */
 .cap-cell {
@@ -550,8 +551,9 @@
 }
 .cell--market { background: var(--fc-blue); color: var(--fc-navy); }
 
-.camp-1 { background: var(--fc-yellow); color: var(--fc-navy); }
-.camp-2 { background: var(--fc-blue); color: var(--fc-navy); }
+.camp-1 { background: var(--fc-blue); color: var(--fc-navy); }
+.camp-2 { background: var(--fc-yellow); color: var(--fc-navy); }
+.camp-3 { background: var(--fc-navy); color: var(--fc-paper); }
 
 .cell-tag { display: inline-flex; line-height: 0; color: var(--fc-navy); }
 .cell-tag svg { width: 15px; height: 15px; stroke-width: 1.9; }
@@ -611,7 +613,7 @@
 }
 .card-head {
   background: var(--accent, var(--fc-yellow));
-  color: var(--fc-navy);
+  color: var(--accent-ink, var(--fc-navy));
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -874,6 +876,7 @@
   color: var(--fc-yellow); background: var(--fc-navy);
   padding: 1px 7px; border-radius: var(--fc-radius-1); align-self: flex-start;
 }
+.prod-country-tag { color: var(--fc-paper); background: var(--fc-navy); letter-spacing: 0.04em; }
 
 /* Pooled product note in the Campaña tabs (breakdown handled at pool level) */
 .prod-pool-note {
@@ -954,8 +957,9 @@
   border: 1px solid var(--fc-ink-100); background: #fff; color: var(--fc-ink-500); cursor: pointer;
 }
 .corte-chip.on { color: var(--fc-navy); font-weight: var(--fc-fw-semibold); border-color: transparent; }
-.corte-chip.on.camp-1 { background: var(--fc-yellow); }
-.corte-chip.on.camp-2 { background: var(--fc-blue); }
+.corte-chip.on.camp-1 { background: var(--fc-blue); }
+.corte-chip.on.camp-2 { background: var(--fc-yellow); }
+.corte-chip.on.camp-3 { background: var(--fc-navy); color: var(--fc-paper); }
 
 .cat-row {
   display: grid; grid-template-columns: 1fr 140px 34px; align-items: center; gap: 10px; margin-bottom: 8px;
@@ -983,8 +987,9 @@
   font-family: var(--fc-font-display); font-size: 9px; font-weight: var(--fc-fw-bold);
   letter-spacing: var(--fc-ls-eyebrow); text-transform: uppercase; color: var(--fc-ink-500);
 }
-.prod-cat-row--c1 { border-left-color: var(--fc-yellow); }
-.prod-cat-row--c2 { border-left-color: var(--fc-blue); }
+.prod-cat-row--c1 { border-left-color: var(--fc-blue); }
+.prod-cat-row--c2 { border-left-color: var(--fc-yellow); }
+.prod-cat-row--c3 { border-left-color: var(--fc-navy); }
 
 .prod-cat-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .catsel-chip {

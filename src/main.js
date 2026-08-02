@@ -35,6 +35,7 @@ const state = {
   prodSel: new Set(), // product ids selected for bulk assignment
   bulkCategory: '', // category to apply in bulk
   bulkPool: '', // pool to apply in bulk
+  bulkCountry: '', // country (origin) to apply in bulk
   status: '',
 };
 
@@ -64,6 +65,7 @@ const TABS = [
   { id: 'bodegas', label: 'Bodegas', group: 'Destino', icon: 'warehouse' },
   { id: 'products:1', label: CAMPAIGNS[1].name, group: 'Productos' },
   { id: 'products:2', label: CAMPAIGNS[2].name, group: 'Productos' },
+  { id: 'products:3', label: CAMPAIGNS[3].name, group: 'Productos' },
 ];
 
 // Refresh Lucide icons after any render that injects [data-lucide] nodes.
@@ -213,16 +215,17 @@ function setPoolOverride(poolId, market, kg) {
 }
 
 // --- Catalog mutations (categories, cortes per campaign, products) ----------
-/** Ensure a single `category` string and a `pool` field per product; pools array. */
+/** Ensure a single `category`, a `pool`, and a `country` per product; pools + cortes[3]. */
 function normalizeCatalog(cat) {
   return {
     ...cat,
+    cortes: { 1: [...(cat.cortes?.[1] || [])], 2: [...(cat.cortes?.[2] || [])], 3: [...(cat.cortes?.[3] || [])] },
     pools: cat.pools || [],
     products: (cat.products || []).map((p) => {
       const { categories, ...rest } = p;
       let category = typeof p.category === 'string' ? p.category : '';
       if (!category && Array.isArray(categories) && categories.length) category = categories[0];
-      return { ...rest, category, pool: p.pool || '' };
+      return { ...rest, category, pool: p.pool || '', country: p.country || 'Colombia' };
     }),
   };
 }
@@ -231,7 +234,7 @@ function catalogCopy() {
   const c = state.catalog;
   return {
     categories: (c.categories || []).map((x) => ({ ...x })),
-    cortes: { 1: [...(c.cortes?.[1] || [])], 2: [...(c.cortes?.[2] || [])] },
+    cortes: { 1: [...(c.cortes?.[1] || [])], 2: [...(c.cortes?.[2] || [])], 3: [...(c.cortes?.[3] || [])] },
     pools: (c.pools || []).map((x) => ({ ...x })),
     products: (c.products || []).map((x) => ({ ...x })),
   };
@@ -276,7 +279,7 @@ function catRemove(key) {
 function prodAdd() {
   const c = catalogCopy();
   const start = c.cortes[1]?.[0] ?? c.cortes[2]?.[0] ?? 9;
-  c.products.push({ id: `p_${Date.now()}`, name: 'Nuevo producto', category: '', startCorte: start });
+  c.products.push({ id: `p_${Date.now()}`, name: 'Nuevo producto', category: '', pool: '', startCorte: start, country: 'Colombia' });
   saveCatalogState(c, false);
 }
 
@@ -318,6 +321,16 @@ function bulkApplyPool() {
   if (!state.prodSel.size) return;
   const c = catalogCopy();
   c.products.forEach((p) => { if (state.prodSel.has(p.id)) p.pool = state.bulkPool; });
+  state.prodSel = new Set();
+  saveCatalogState(c, false);
+}
+
+function setBulkCountry(name) { state.bulkCountry = name; render(); }
+
+function bulkApplyCountry() {
+  if (!state.prodSel.size || !state.bulkCountry) return;
+  const c = catalogCopy();
+  c.products.forEach((p) => { if (state.prodSel.has(p.id)) p.country = state.bulkCountry; });
   state.prodSel = new Set();
   saveCatalogState(c, false);
 }
@@ -392,12 +405,15 @@ function renderModal() {
     selected: state.prodSel,
     bulkCategory: state.bulkCategory,
     bulkPool: state.bulkPool,
+    bulkCountry: state.bulkCountry,
     onToggleSelect: toggleProdSel,
     onSelectAll: selectProds,
     onBulkCategory: setBulkCategory,
     onBulkApply: bulkApplyCategory,
     onBulkPool: setBulkPool,
     onBulkApplyPool: bulkApplyPool,
+    onBulkCountry: setBulkCountry,
+    onBulkApplyCountry: bulkApplyCountry,
     onPoolAdd: poolAdd,
     onPoolUpdate: poolUpdate,
     onPoolRemove: poolRemove,

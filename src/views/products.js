@@ -1,8 +1,13 @@
 import {
-  monthName, CUTOFF_DAY, OFFSETS, mod12, campaignOfMonth, CAMPAIGNS,
+  monthName, CUTOFF_DAY, OFFSETS, mod12, productCampaign, CAMPAIGNS,
   allocateProduct, marketGoalTotal, warehouseGoalTotal,
   kgToContainers, DEFAULT_COMPROMETIDO_PCT, poolCapacity,
 } from '../model.js';
+
+// Card header text: dark on the light accents (Campaña 1/2), light on navy (Rwanda).
+function accentInk(campaign) {
+  return campaign === 3 ? '#ffffff' : '#1b203d';
+}
 
 /**
  * Products view — editable catalogue (via the modal) + capacity commitment plan.
@@ -26,7 +31,7 @@ export function renderProducts({
   }));
 
   // Products of this campaign, grouped by start cutoff.
-  const mine = (catalog?.products || []).filter((p) => campaignOfMonth(p.startCorte) === campaign);
+  const mine = (catalog?.products || []).filter((p) => productCampaign(p) === campaign);
   const cortes = [...new Set(mine.map((p) => p.startCorte))]
     .sort((a, b) => order(a, campaign) - order(b, campaign));
 
@@ -197,6 +202,7 @@ function poolCard(pl, catalog, alloc, marketMetas, globalPct, onPoolPct, onPoolO
   card.className = 'card prod-card';
   const camp = Number(pl.campaign) || 1;
   card.style.setProperty('--accent', CAMPAIGNS[camp].color);
+  card.style.setProperty('--accent-ink', accentInk(camp));
 
   const h = document.createElement('header');
   h.className = 'card-head';
@@ -280,6 +286,7 @@ function corteCard(corte, campaign, items, catById, poolById, marketMetas, produ
   const card = document.createElement('article');
   card.className = 'card prod-card';
   card.style.setProperty('--accent', CAMPAIGNS[campaign].color);
+  card.style.setProperty('--accent-ink', accentInk(campaign));
 
   const h = document.createElement('header');
   h.className = 'card-head';

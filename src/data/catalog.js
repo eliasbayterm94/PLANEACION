@@ -25,10 +25,13 @@ export const defaultCategories = [
  * Cutoff months per campaign.
  * Campaña 1 = mitaca (Jun–Sep, the smaller crop).
  * Campaña 2 = cosecha principal (Oct–Ene, the larger one in kg).
+ * Campaña Rwanda = separate origin (cosecha Mar–Jul, despacho Jun–Sep → cortes
+ *   May–Ago); its products carry country 'Rwanda'.
  */
 export const defaultCortes = {
   1: [5, 6, 7, 8], // Jun, Jul, Ago, Sep  → primer, segundo, tercer, cuarto
   2: [9, 10, 11, 0], // Oct, Nov, Dic, Ene  → primer, segundo, tercer, cuarto
+  3: [4, 5, 6, 7], // May, Jun, Jul, Ago (Rwanda) → despacho Jun–Sep
 };
 
 // Pools group products sold together against one combined kg meta, per campaign.
@@ -133,6 +136,7 @@ export const defaultProducts = seedRows.map(([name, category, startCorte, pool])
   category,
   pool,
   startCorte,
+  country: 'Colombia', // Rwanda products (Campaña Rwanda) carry country 'Rwanda'
 }));
 
 /** Seed Capacidad (kg) per product id, from the sheet's kg column (>0 only). */
@@ -144,7 +148,7 @@ export const defaultCapacities = Object.fromEntries(
 
 export const emptyCatalog = () => ({
   categories: defaultCategories.map((c) => ({ ...c })),
-  cortes: { 1: [...defaultCortes[1]], 2: [...defaultCortes[2]] },
+  cortes: { 1: [...defaultCortes[1]], 2: [...defaultCortes[2]], 3: [...defaultCortes[3]] },
   pools: defaultPools.map((p) => ({ ...p })),
   products: defaultProducts.map((p) => ({ ...p })),
 });

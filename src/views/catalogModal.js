@@ -1,4 +1,7 @@
-import { MONTHS, monthName, campaignOfMonth, CAMPAIGNS } from '../model.js';
+import { MONTHS, monthName, productCampaign, CAMPAIGNS } from '../model.js';
+
+const CAMPAIGN_IDS = [1, 2, 3];
+const COUNTRIES = ['Colombia', 'Rwanda'];
 
 /**
  * "Gestionar productos" modal — edit the catalogue.
@@ -13,8 +16,9 @@ export function renderCatalogModal({
   catalog, tab, onTab, onClose,
   onToggleCorte, onCatAdd, onCatUpdate, onCatRemove,
   onProdAdd, onProdUpdate, onProdRemove, onResetCatalog,
-  selected, bulkCategory, bulkPool,
+  selected, bulkCategory, bulkPool, bulkCountry,
   onToggleSelect, onSelectAll, onBulkCategory, onBulkApply, onBulkPool, onBulkApplyPool,
+  onBulkCountry, onBulkApplyCountry,
   onPoolAdd, onPoolUpdate, onPoolRemove,
 }) {
   const backdrop = document.createElement('div');
@@ -59,8 +63,9 @@ export function renderCatalogModal({
   else if (tab === 'pools') body.appendChild(poolsSection(catalog, onPoolAdd, onPoolUpdate, onPoolRemove));
   else body.appendChild(productsSection(catalog, {
     onProdAdd, onProdUpdate, onProdRemove, onResetCatalog,
-    selected: selected || new Set(), bulkCategory: bulkCategory || '', bulkPool: bulkPool || '',
+    selected: selected || new Set(), bulkCategory: bulkCategory || '', bulkPool: bulkPool || '', bulkCountry: bulkCountry || '',
     onToggleSelect, onSelectAll, onBulkCategory, onBulkApply, onBulkPool, onBulkApplyPool,
+    onBulkCountry, onBulkApplyCountry,
   }));
   panel.appendChild(body);
 
@@ -76,7 +81,7 @@ function cortesSection(catalog, onToggleCorte) {
   intro.innerHTML = 'Marca los meses que tienen corte en cada campaña. Define las bandas y el color en toda la app.';
   wrap.appendChild(intro);
 
-  [1, 2].forEach((camp) => {
+  CAMPAIGN_IDS.forEach((camp) => {
     const months = catalog.cortes?.[camp] || [];
     const block = document.createElement('div');
     block.className = 'cortes-block';
@@ -182,7 +187,7 @@ function poolsSection(catalog, onPoolAdd, onPoolUpdate, onPoolRemove) {
 
     const campSel = document.createElement('select');
     campSel.className = 'wh-select';
-    [1, 2].forEach((n) => {
+    CAMPAIGN_IDS.forEach((n) => {
       const o = document.createElement('option');
       o.value = n; o.textContent = CAMPAIGNS[n].name;
       if (camp === n) o.selected = true;
@@ -224,7 +229,7 @@ function poolsSection(catalog, onPoolAdd, onPoolUpdate, onPoolRemove) {
 // --- Productos -------------------------------------------------------------
 function corteOptions(catalog, currentStart) {
   const opts = [];
-  [1, 2].forEach((camp) => {
+  CAMPAIGN_IDS.forEach((camp) => {
     (catalog.cortes?.[camp] || []).forEach((m) => opts.push({ value: m, label: `${CAMPAIGNS[camp].name} · ${monthName(m)}` }));
   });
   if (currentStart != null && !opts.some((o) => o.value === currentStart)) {
@@ -236,8 +241,8 @@ function corteOptions(catalog, currentStart) {
 function productsSection(catalog, cb) {
   const {
     onProdAdd, onProdUpdate, onProdRemove, onResetCatalog,
-    selected, bulkCategory, bulkPool, onToggleSelect, onSelectAll,
-    onBulkCategory, onBulkApply, onBulkPool, onBulkApplyPool,
+    selected, bulkCategory, bulkPool, bulkCountry, onToggleSelect, onSelectAll,
+    onBulkCategory, onBulkApply, onBulkPool, onBulkApplyPool, onBulkCountry, onBulkApplyCountry,
   } = cb;
   const cats = catalog.categories || [];
   const pools = catalog.pools || [];
@@ -301,6 +306,30 @@ function productsSection(catalog, cb) {
   applyPool.disabled = !selected.size;
   applyPool.addEventListener('click', () => onBulkApplyPool());
   bulk.appendChild(applyPool);
+
+  // Country (origin) bulk assignment — Colombia / Rwanda
+  if (onBulkCountry) {
+    const cSel = document.createElement('select');
+    cSel.className = 'wh-select';
+    const cph = document.createElement('option'); cph.value = ''; cph.textContent = '— país —';
+    if (!bulkCountry) cph.selected = true; cSel.appendChild(cph);
+    COUNTRIES.forEach((name) => {
+      const o = document.createElement('option');
+      o.value = name; o.textContent = name;
+      if (bulkCountry === name) o.selected = true;
+      cSel.appendChild(o);
+    });
+    cSel.addEventListener('change', (e) => onBulkCountry(e.target.value));
+    bulk.appendChild(cSel);
+
+    const applyCountry = document.createElement('button');
+    applyCountry.type = 'button';
+    applyCountry.className = 'fc-btn fc-btn-navy bulk-apply';
+    applyCountry.textContent = 'Aplicar país';
+    applyCountry.disabled = !selected.size || !bulkCountry;
+    applyCountry.addEventListener('click', () => onBulkApplyCountry());
+    bulk.appendChild(applyCountry);
+  }
   wrap.appendChild(bulk);
 
   // Header with select-all
@@ -322,7 +351,7 @@ function productsSection(catalog, cb) {
   sorted.forEach((p) => {
     const row = document.createElement('div');
     row.className = 'prod-cat-row' + (selected.has(p.id) ? ' is-selected' : '');
-    const camp = campaignOfMonth(p.startCorte);
+    const camp = productCampaign(p);
     if (camp) row.classList.add(`prod-cat-row--c${camp}`);
 
     const check = document.createElement('input');
@@ -342,6 +371,12 @@ function productsSection(catalog, cb) {
     name.setAttribute('aria-label', 'Nombre del producto');
     name.addEventListener('change', (e) => onProdUpdate(p.id, 'name', e.target.value.trim() || p.name));
     nameCell.appendChild(name);
+    if (p.country === 'Rwanda') {
+      const ctag = document.createElement('span');
+      ctag.className = 'prod-pool-tag prod-country-tag';
+      ctag.textContent = 'Rwanda';
+      nameCell.appendChild(ctag);
+    }
     if (p.pool && poolById[p.pool]) {
       const ptag = document.createElement('span');
       ptag.className = 'prod-pool-tag';

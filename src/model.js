@@ -40,13 +40,20 @@ export const CUTOFF_DAY = 15;
  * NAMING (confirmed by Elias): Campaña 1 = mitaca/traviesa (Jun-Sep cutoffs,
  * the smaller crop); Campaña 2 = cosecha principal (Oct-Ene cutoffs, the larger
  * one in kg). Flip `cutoffMonths` below if this ever reverses.
+ *
+ * Campaña Rwanda (3) is a separate origin whose window (cosecha Mar-Jul,
+ * despacho Jun-Sep → cortes May-Ago) OVERLAPS Colombia's Campaña 1 in months,
+ * so its products are distinguished by `country: 'Rwanda'`, not by month —
+ * `productCampaign()` resolves it. Colombia products stay month-derived.
  */
 // Colours follow the Forest design system closed palette (design system rule 6):
-// the main crop (now Campaña 2) = brand yellow, the mitaca (Campaña 1) = brand
-// blue — colour tracks the crop so each month keeps its calendar colour.
+// the main crop (Campaña 2) = brand yellow, the mitaca (Campaña 1) = brand blue,
+// Rwanda = brand navy — colour tracks the crop so each month keeps its calendar
+// colour.
 export const CAMPAIGNS = {
   1: { name: 'Campaña 1', cutoffMonths: [5, 6, 7, 8], color: '#95b5ce' },
   2: { name: 'Campaña 2', cutoffMonths: [9, 10, 11, 0], color: '#e7e244' },
+  3: { name: 'Campaña Rwanda', cutoffMonths: [4, 5, 6, 7], color: '#1b203d' },
 };
 
 /** Months in which nothing lands anywhere. Complement of the delivery calendar. */
@@ -106,10 +113,21 @@ export function setCampaignCortes(cortes = {}) {
   });
 }
 
-/** Which campaign a given cutoff month belongs to. */
+/** Which campaign a given cutoff month belongs to (Colombia windows). */
 export function campaignOfMonth(m) {
   const hit = Object.entries(CAMPAIGNS).find(([, c]) => c.cutoffMonths.includes(mod12(m)));
   return hit ? Number(hit[0]) : null;
+}
+
+/**
+ * The campaign a PRODUCT belongs to. Rwanda products (country 'Rwanda') go to
+ * the Rwanda campaign (3) regardless of month, since their window overlaps
+ * Colombia's. Colombia products derive from their cutoff month.
+ */
+export const RWANDA_CAMPAIGN = 3;
+export function productCampaign(p) {
+  if (p && p.country === 'Rwanda') return RWANDA_CAMPAIGN;
+  return campaignOfMonth(p?.startCorte);
 }
 
 /** A region's dominant campaign — for grouping and colour only, never for logic. */
