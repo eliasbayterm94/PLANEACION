@@ -868,6 +868,15 @@
   padding: 1px 7px; border-radius: var(--fc-radius-1); align-self: flex-start;
 }
 
+/* Pooled product note in the Campaña tabs (breakdown handled at pool level) */
+.prod-pool-note {
+  margin: 6px 0 0; padding: 6px 10px;
+  border-left: 3px solid var(--fc-navy);
+  background: var(--fc-cream);
+  font-size: 12px; color: var(--fc-ink-500); font-style: italic;
+  border-radius: 0 var(--fc-radius-1) var(--fc-radius-1) 0;
+}
+
 /* --- Modal (Gestionar productos) ---------------------------------------- */
 .modal-backdrop {
   position: fixed;

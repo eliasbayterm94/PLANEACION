@@ -14,7 +14,7 @@ import {
  */
 export function renderProducts({
   campaign, markets, warehouses, goals, alloc, catalog,
-  onCap, onProductPct, onOverride, onGlobalPct, onManage,
+  onCap, onProductPct, onOverride, onGlobalPct, onManage, onPoolPct, onPoolOverride,
 }) {
   const el = document.createElement('div');
   const products = alloc?.products || {};
@@ -32,11 +32,20 @@ export function renderProducts({
 
   const poolById = Object.fromEntries((catalog?.pools || []).map((pl) => [pl.id, pl]));
 
-  el.appendChild(header(campaign, globalPct, onGlobalPct, onManage));
-  el.appendChild(rollup(mine, marketMetas, products, globalPct));
-
   const camPools = (catalog?.pools || []).filter((pl) => Number(pl.campaign) === campaign);
-  if (camPools.length) el.appendChild(poolSummary(camPools, catalog, alloc));
+
+  el.appendChild(header(campaign, globalPct, onGlobalPct, onManage));
+  el.appendChild(rollup(mine, camPools, marketMetas, alloc, globalPct, catalog));
+
+  if (camPools.length) {
+    const sec = document.createElement('div');
+    const title = document.createElement('h3');
+    title.className = 'section-title';
+    title.textContent = 'Pools — reparto a nivel pool';
+    sec.appendChild(title);
+    camPools.forEach((pl) => sec.appendChild(poolCard(pl, catalog, alloc, marketMetas, globalPct, onPoolPct, onPoolOverride)));
+    el.appendChild(sec);
+  }
 
   cortes.forEach((corte) => {
     const items = mine.filter((p) => p.startCorte === corte).sort((a, b) => a.name.localeCompare(b.name));
@@ -104,19 +113,34 @@ function header(campaign, globalPct, onGlobalPct, onManage) {
   return head;
 }
 
-function rollup(mine, marketMetas, products, globalPct) {
+function poolEntry(pl, catalog, alloc) {
+  const a = alloc?.pools?.[pl.id] || {};
+  return { cap: poolCapacity(catalog, alloc, pl.id), pct: a.pct ?? null, ov: a.ov || {} };
+}
+
+function rollup(mine, camPools, marketMetas, alloc, globalPct, catalog) {
+  const products = alloc?.products || {};
   const perMarket = {};
   marketMetas.forEach((m) => { perMarket[m.slug] = { comprometido: 0, libre: 0 }; });
   let totalCap = 0;
-  mine.forEach((p) => {
-    const entry = products[p.id];
-    if (!entry) return;
-    totalCap += Number(entry.cap) || 0;
+  const add = (entry) => {
     const a = allocateProduct(entry, marketMetas, globalPct);
     marketMetas.forEach((m) => {
       perMarket[m.slug].comprometido += a.byMarket[m.slug].comprometido;
       perMarket[m.slug].libre += a.byMarket[m.slug].libre;
     });
+  };
+  // Non-pooled products allocate individually; pooled products roll into the pool.
+  mine.filter((p) => !p.pool).forEach((p) => {
+    const entry = products[p.id];
+    if (!entry) return;
+    totalCap += Number(entry.cap) || 0;
+    add(entry);
+  });
+  camPools.forEach((pl) => {
+    const entry = poolEntry(pl, catalog, alloc);
+    totalCap += entry.cap;
+    add(entry);
   });
   const totalMeta = marketMetas.reduce((s, m) => s + m.meta, 0);
 
@@ -156,33 +180,90 @@ function rollup(mine, marketMetas, products, globalPct) {
   return wrap;
 }
 
-function poolSummary(pools, catalog, alloc) {
-  const wrap = document.createElement('div');
-  const title = document.createElement('h3');
-  title.className = 'section-title';
-  title.textContent = 'Pools (meta combinada)';
-  wrap.appendChild(title);
+function poolCard(pl, catalog, alloc, marketMetas, globalPct, onPoolPct, onPoolOverride) {
+  const entry = poolEntry(pl, catalog, alloc);
+  const cap = entry.cap;
+  const meta = Number(pl.meta) || 0;
+  const members = (catalog.products || []).filter((p) => p.pool === pl.id).length;
+  const fill = meta ? Math.round((cap / meta) * 100) : 0;
 
-  const cards = document.createElement('div');
-  cards.className = 'prod-rollup';
-  pools.forEach((pl) => {
-    const cap = poolCapacity(catalog, alloc, pl.id);
-    const meta = Number(pl.meta) || 0;
-    const members = (catalog.products || []).filter((p) => p.pool === pl.id).length;
-    const fill = meta ? Math.round((cap / meta) * 100) : 0;
-    const card = document.createElement('div');
-    card.className = 'prod-rollup-card';
-    card.innerHTML =
-      `<div class="prod-rollup-name">${pl.name}</div>` +
-      `<div class="prod-rollup-bar">` +
-        `<span class="seg seg-base" style="flex:${Math.min(cap, meta) || 0}"></span>` +
-        `<span class="seg seg-gap" style="flex:${Math.max(0, meta - cap) || 0}"></span>` +
-      `</div>` +
-      `<div class="prod-rollup-meta">${fmtKg(cap)} cap${meta ? ` · meta ${fmtKg(meta)} · <strong class="tally tally--${cap >= meta ? 'exact' : 'under'}">${fill}%</strong>` : ' · sin meta'} · ${members} prod</div>`;
-    cards.appendChild(card);
+  const card = document.createElement('article');
+  card.className = 'card prod-card';
+  const camp = Number(pl.campaign) || 1;
+  card.style.setProperty('--accent', CAMPAIGNS[camp].color);
+
+  const h = document.createElement('header');
+  h.className = 'card-head';
+  h.innerHTML =
+    `<span class="card-cut">${pl.name}</span>` +
+    `<span class="card-sample">${fmtKg(cap)} cap${meta ? ` · meta ${fmtKg(meta)} · ${fill}%` : ''} · ${members} productos</span>`;
+  card.appendChild(h);
+
+  const body = document.createElement('div');
+  body.className = 'prod-items';
+
+  const item = document.createElement('div');
+  item.className = 'prod-item';
+  const head = document.createElement('div');
+  head.className = 'prod-item-head prod-cap-head';
+  head.innerHTML = '<span class="prod-item-name">Reparto del pool por mercado</span>';
+  const pctInput = document.createElement('input');
+  pctInput.type = 'number'; pctInput.min = '0'; pctInput.max = '100'; pctInput.step = '5';
+  pctInput.className = 'alloc-input prod-pct-input';
+  pctInput.value = entry.pct != null ? entry.pct : '';
+  pctInput.placeholder = `${globalPct}%`;
+  pctInput.title = 'Comprometido % del pool (vacío = global)';
+  pctInput.setAttribute('aria-label', `Comprometido % del pool ${pl.name}`);
+  pctInput.addEventListener('change', (e) => {
+    const raw = e.target.value;
+    onPoolPct(pl.id, raw === '' ? null : Math.min(100, Math.max(0, Number(raw) || 0)));
   });
-  wrap.appendChild(cards);
-  return wrap;
+  head.appendChild(pctInput);
+  item.appendChild(head);
+
+  if (cap > 0) {
+    const a = allocateProduct(entry, marketMetas, globalPct);
+    const grid = document.createElement('div');
+    grid.className = 'prod-breakdown';
+    marketMetas.filter((m) => m.meta > 0 || (entry.ov && entry.ov[m.slug] != null)).forEach((m) => {
+      const c = a.byMarket[m.slug];
+      const row = document.createElement('div');
+      row.className = 'prod-bd-row';
+      row.innerHTML =
+        `<span class="prod-bd-mk">${m.name}${c.locked ? ' <span class="row-meta">fijo</span>' : ''}</span>` +
+        `<span class="prod-bd-val">C ${fmtKg(c.comprometido)} · L ${fmtKg(c.libre)}</span>`;
+      const ov = document.createElement('input');
+      ov.type = 'number'; ov.min = '0'; ov.step = '1000';
+      ov.className = 'alloc-input prod-ov-input';
+      ov.value = entry.ov && entry.ov[m.slug] != null ? entry.ov[m.slug] : '';
+      ov.placeholder = `auto ${Math.round(c.total).toLocaleString('es-CO')}`;
+      ov.title = 'Override kg del pool (vacío = automático por meta)';
+      ov.setAttribute('aria-label', `Override del pool ${pl.name} en ${m.name}`);
+      ov.addEventListener('change', (e) => {
+        const raw = e.target.value;
+        onPoolOverride(pl.id, m.slug, raw === '' ? null : Math.max(0, Number(raw) || 0));
+      });
+      row.appendChild(ov);
+      grid.appendChild(row);
+    });
+    if (a.unassigned > 0) {
+      const warn = document.createElement('div');
+      warn.className = 'prod-unassigned';
+      warn.textContent = `Sin asignar: ${fmtKg(a.unassigned)} (revisa metas u overrides)`;
+      grid.appendChild(warn);
+    }
+    item.appendChild(grid);
+  } else {
+    const note = document.createElement('p');
+    note.className = 'view-sub';
+    note.style.margin = '4px 0 0';
+    note.textContent = 'Sin capacidad aún — carga capacidad en los productos del pool.';
+    item.appendChild(note);
+  }
+
+  body.appendChild(item);
+  card.appendChild(body);
+  return card;
 }
 
 function corteCard(corte, campaign, items, catById, poolById, marketMetas, products, globalPct, onCap, onProductPct, onOverride) {
@@ -246,22 +327,29 @@ function productItem(p, catById, poolById, marketMetas, products, globalPct, onC
   capInput.addEventListener('change', (e) => onCap(key, Math.max(0, Number(e.target.value) || 0)));
   head.appendChild(capInput);
 
-  const pctInput = document.createElement('input');
-  pctInput.type = 'number';
-  pctInput.min = '0'; pctInput.max = '100'; pctInput.step = '5';
-  pctInput.className = 'alloc-input prod-pct-input';
-  pctInput.value = entry.pct != null ? entry.pct : '';
-  pctInput.placeholder = `${globalPct}%`;
-  pctInput.title = 'Comprometido % (vacío = global)';
-  pctInput.setAttribute('aria-label', `Comprometido % de ${p.name}`);
-  pctInput.addEventListener('change', (e) => {
-    const raw = e.target.value;
-    onProductPct(key, raw === '' ? null : Math.min(100, Math.max(0, Number(raw) || 0)));
-  });
-  head.appendChild(pctInput);
+  if (!p.pool) {
+    const pctInput = document.createElement('input');
+    pctInput.type = 'number';
+    pctInput.min = '0'; pctInput.max = '100'; pctInput.step = '5';
+    pctInput.className = 'alloc-input prod-pct-input';
+    pctInput.value = entry.pct != null ? entry.pct : '';
+    pctInput.placeholder = `${globalPct}%`;
+    pctInput.title = 'Comprometido % (vacío = global)';
+    pctInput.setAttribute('aria-label', `Comprometido % de ${p.name}`);
+    pctInput.addEventListener('change', (e) => {
+      const raw = e.target.value;
+      onProductPct(key, raw === '' ? null : Math.min(100, Math.max(0, Number(raw) || 0)));
+    });
+    head.appendChild(pctInput);
+  }
   wrap.appendChild(head);
 
-  if (cap > 0) {
+  if (p.pool && poolById[p.pool]) {
+    const note = document.createElement('div');
+    note.className = 'prod-pool-note';
+    note.textContent = `Aporta al pool "${poolById[p.pool].name}" — el reparto por mercado se hace a nivel pool.`;
+    wrap.appendChild(note);
+  } else if (cap > 0) {
     const a = allocateProduct(entry, marketMetas, globalPct);
     const grid = document.createElement('div');
     grid.className = 'prod-breakdown';

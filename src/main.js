@@ -149,6 +149,7 @@ function allocBase() {
   return {
     pctComprometido: state.alloc?.pctComprometido ?? DEFAULT_COMPROMETIDO_PCT,
     products: { ...(state.alloc?.products || {}) },
+    pools: { ...(state.alloc?.pools || {}) },
   };
 }
 
@@ -185,6 +186,29 @@ function setOverride(key, market, kg) {
   if (kg == null) delete p.ov[market];
   else p.ov[market] = kg;
   a.products[key] = p;
+  saveAllocState(a);
+}
+
+// Pool-level allocation (capacity from members; % + overrides on the pool).
+function poolAllocCopy(a, poolId) {
+  const cur = a.pools[poolId] || {};
+  return { pct: cur.pct ?? null, ov: { ...(cur.ov || {}) } };
+}
+
+function setPoolPct(poolId, pct) {
+  const a = allocBase();
+  const pe = poolAllocCopy(a, poolId);
+  pe.pct = pct;
+  a.pools[poolId] = pe;
+  saveAllocState(a);
+}
+
+function setPoolOverride(poolId, market, kg) {
+  const a = allocBase();
+  const pe = poolAllocCopy(a, poolId);
+  if (kg == null) delete pe.ov[market];
+  else pe.ov[market] = kg;
+  a.pools[poolId] = pe;
   saveAllocState(a);
 }
 
@@ -474,6 +498,8 @@ function renderView() {
       onProductPct: (key, pct) => setProductPct(key, pct),
       onOverride: (key, market, kg) => setOverride(key, market, kg),
       onGlobalPct: (pct) => setGlobalPct(pct),
+      onPoolPct: (poolId, pct) => setPoolPct(poolId, pct),
+      onPoolOverride: (poolId, market, kg) => setPoolOverride(poolId, market, kg),
       onManage: () => { state.modalOpen = true; state.modalTab = 'productos'; render(); },
     }));
   }
