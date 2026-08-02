@@ -33,6 +33,7 @@ export const defaultProducts = productReleases.flatMap((r) =>
     id: `${r.cutoffMonth}::${name}`,
     name,
     category: '', // one category — assign (in bulk) from the modal
+    pool: '', // optional pool id — products sold together against one meta
     startCorte: r.cutoffMonth,
   })),
 );
@@ -40,5 +41,6 @@ export const defaultProducts = productReleases.flatMap((r) =>
 export const emptyCatalog = () => ({
   categories: defaultCategories.map((c) => ({ ...c })),
   cortes: { 1: [...defaultCortes[1]], 2: [...defaultCortes[2]] },
+  pools: [], // { id, name, campaign, meta } — product pools with a combined meta
   products: defaultProducts.map((p) => ({ ...p })),
 });

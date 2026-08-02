@@ -411,6 +411,14 @@ export function warehouseAllocatedAll(shipments, whName) {
   return Object.values(shipments || {}).reduce((s, rs) => s + warehouseAllocated(rs, whName), 0);
 }
 
+/** Combined capacity (kg) of the products belonging to one pool. */
+export function poolCapacity(catalog, alloc, poolId) {
+  return (catalog?.products || []).reduce((s, p) => {
+    if (p.pool === poolId) return s + (Number(alloc?.products?.[p.id]?.cap) || 0);
+    return s;
+  }, 0);
+}
+
 /** Company-level goal for a category (Community / MIRC), in kg. */
 export function companyGoal(goals, category) {
   return Number(goals?.company?.[category]) || 0;

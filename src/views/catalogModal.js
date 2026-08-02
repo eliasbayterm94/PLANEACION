@@ -13,7 +13,9 @@ export function renderCatalogModal({
   catalog, tab, onTab, onClose,
   onToggleCorte, onCatAdd, onCatUpdate, onCatRemove,
   onProdAdd, onProdUpdate, onProdRemove,
-  selected, bulkCategory, onToggleSelect, onSelectAll, onBulkCategory, onBulkApply,
+  selected, bulkCategory, bulkPool,
+  onToggleSelect, onSelectAll, onBulkCategory, onBulkApply, onBulkPool, onBulkApplyPool,
+  onPoolAdd, onPoolUpdate, onPoolRemove,
 }) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -40,7 +42,7 @@ export function renderCatalogModal({
   // Tabs
   const tabs = document.createElement('div');
   tabs.className = 'modal-tabs';
-  [['cortes', 'Cortes por campaña'], ['categorias', 'Categorías'], ['productos', 'Productos']].forEach(([id, label]) => {
+  [['cortes', 'Cortes por campaña'], ['categorias', 'Categorías'], ['pools', 'Pools'], ['productos', 'Productos']].forEach(([id, label]) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'modal-tab' + (tab === id ? ' active' : '');
@@ -54,10 +56,11 @@ export function renderCatalogModal({
   body.className = 'modal-body';
   if (tab === 'cortes') body.appendChild(cortesSection(catalog, onToggleCorte));
   else if (tab === 'categorias') body.appendChild(categoriesSection(catalog, onCatAdd, onCatUpdate, onCatRemove));
+  else if (tab === 'pools') body.appendChild(poolsSection(catalog, onPoolAdd, onPoolUpdate, onPoolRemove));
   else body.appendChild(productsSection(catalog, {
     onProdAdd, onProdUpdate, onProdRemove,
-    selected: selected || new Set(), bulkCategory: bulkCategory || '',
-    onToggleSelect, onSelectAll, onBulkCategory, onBulkApply,
+    selected: selected || new Set(), bulkCategory: bulkCategory || '', bulkPool: bulkPool || '',
+    onToggleSelect, onSelectAll, onBulkCategory, onBulkApply, onBulkPool, onBulkApplyPool,
   }));
   panel.appendChild(body);
 
@@ -150,6 +153,74 @@ function categoriesSection(catalog, onCatAdd, onCatUpdate, onCatRemove) {
   return wrap;
 }
 
+// --- Pools -----------------------------------------------------------------
+function poolsSection(catalog, onPoolAdd, onPoolUpdate, onPoolRemove) {
+  const wrap = document.createElement('div');
+  const intro = document.createElement('p');
+  intro.className = 'view-sub';
+  intro.innerHTML = 'Un <strong>pool</strong> agrupa productos con una <strong>meta combinada</strong> (kg), por campaña. Los productos se marcan en la pestaña <strong>Productos</strong>.';
+  wrap.appendChild(intro);
+
+  const heads = document.createElement('div');
+  heads.className = 'pool-row pool-row--head';
+  heads.innerHTML = '<span>Pool</span><span>Campaña</span><span>Meta (kg)</span><span></span>';
+  wrap.appendChild(heads);
+
+  (catalog.pools || []).forEach((pool) => {
+    const row = document.createElement('div');
+    row.className = 'pool-row';
+    const camp = Number(pool.campaign) || 1;
+    row.classList.add(`prod-cat-row--c${camp}`);
+
+    const name = document.createElement('input');
+    name.type = 'text';
+    name.className = 'metas-input';
+    name.value = pool.name;
+    name.setAttribute('aria-label', 'Nombre del pool');
+    name.addEventListener('change', (e) => onPoolUpdate(pool.id, 'name', e.target.value.trim() || pool.name));
+    row.appendChild(name);
+
+    const campSel = document.createElement('select');
+    campSel.className = 'wh-select';
+    [1, 2].forEach((n) => {
+      const o = document.createElement('option');
+      o.value = n; o.textContent = CAMPAIGNS[n].name;
+      if (camp === n) o.selected = true;
+      campSel.appendChild(o);
+    });
+    campSel.addEventListener('change', (e) => onPoolUpdate(pool.id, 'campaign', Number(e.target.value)));
+    row.appendChild(campSel);
+
+    const meta = document.createElement('input');
+    meta.type = 'number';
+    meta.min = '0'; meta.step = '1000';
+    meta.className = 'metas-input';
+    meta.value = pool.meta || '';
+    meta.placeholder = '0';
+    meta.setAttribute('aria-label', 'Meta del pool en kg');
+    meta.addEventListener('change', (e) => onPoolUpdate(pool.id, 'meta', Math.max(0, Number(e.target.value) || 0)));
+    row.appendChild(meta);
+
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'wh-remove wh-remove--inline';
+    rm.title = `Quitar ${pool.name}`;
+    rm.innerHTML = '<i data-lucide="trash-2"></i>';
+    rm.addEventListener('click', () => onPoolRemove(pool.id));
+    row.appendChild(rm);
+
+    wrap.appendChild(row);
+  });
+
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'wh-add';
+  add.innerHTML = '<i data-lucide="plus"></i> Agregar pool';
+  add.addEventListener('click', () => onPoolAdd(1));
+  wrap.appendChild(add);
+  return wrap;
+}
+
 // --- Productos -------------------------------------------------------------
 function corteOptions(catalog, currentStart) {
   const opts = [];
@@ -165,9 +236,12 @@ function corteOptions(catalog, currentStart) {
 function productsSection(catalog, cb) {
   const {
     onProdAdd, onProdUpdate, onProdRemove,
-    selected, bulkCategory, onToggleSelect, onSelectAll, onBulkCategory, onBulkApply,
+    selected, bulkCategory, bulkPool, onToggleSelect, onSelectAll,
+    onBulkCategory, onBulkApply, onBulkPool, onBulkApplyPool,
   } = cb;
   const cats = catalog.categories || [];
+  const pools = catalog.pools || [];
+  const poolById = Object.fromEntries(pools.map((p) => [p.id, p]));
   const sorted = [...(catalog.products || [])].sort((a, b) => a.startCorte - b.startCorte || a.name.localeCompare(b.name));
   const ids = sorted.map((p) => p.id);
 
@@ -201,10 +275,32 @@ function productsSection(catalog, cb) {
   const apply = document.createElement('button');
   apply.type = 'button';
   apply.className = 'fc-btn fc-btn-primary bulk-apply';
-  apply.textContent = 'Aplicar a seleccionados';
+  apply.textContent = 'Aplicar categoría';
   apply.disabled = !selected.size;
   apply.addEventListener('click', () => onBulkApply());
   bulk.appendChild(apply);
+
+  // Pool bulk assignment
+  const poolSel = document.createElement('select');
+  poolSel.className = 'wh-select';
+  const pph = document.createElement('option'); pph.value = ''; pph.textContent = '— pool —';
+  if (!bulkPool) pph.selected = true; poolSel.appendChild(pph);
+  pools.forEach((pl) => {
+    const o = document.createElement('option');
+    o.value = pl.id; o.textContent = `${pl.name} (${CAMPAIGNS[Number(pl.campaign) || 1].name})`;
+    if (bulkPool === pl.id) o.selected = true;
+    poolSel.appendChild(o);
+  });
+  poolSel.addEventListener('change', (e) => onBulkPool(e.target.value));
+  bulk.appendChild(poolSel);
+
+  const applyPool = document.createElement('button');
+  applyPool.type = 'button';
+  applyPool.className = 'fc-btn fc-btn-navy bulk-apply';
+  applyPool.textContent = 'Aplicar pool';
+  applyPool.disabled = !selected.size;
+  applyPool.addEventListener('click', () => onBulkApplyPool());
+  bulk.appendChild(applyPool);
   wrap.appendChild(bulk);
 
   // Header with select-all
@@ -237,13 +333,22 @@ function productsSection(catalog, cb) {
     check.addEventListener('change', () => onToggleSelect(p.id));
     row.appendChild(check);
 
+    const nameCell = document.createElement('div');
+    nameCell.className = 'prod-name-cell';
     const name = document.createElement('input');
     name.type = 'text';
     name.className = 'metas-input';
     name.value = p.name;
     name.setAttribute('aria-label', 'Nombre del producto');
     name.addEventListener('change', (e) => onProdUpdate(p.id, 'name', e.target.value.trim() || p.name));
-    row.appendChild(name);
+    nameCell.appendChild(name);
+    if (p.pool && poolById[p.pool]) {
+      const ptag = document.createElement('span');
+      ptag.className = 'prod-pool-tag';
+      ptag.textContent = `pool: ${poolById[p.pool].name}`;
+      nameCell.appendChild(ptag);
+    }
+    row.appendChild(nameCell);
 
     const cat = document.createElement('select');
     cat.className = 'wh-select cat-select';

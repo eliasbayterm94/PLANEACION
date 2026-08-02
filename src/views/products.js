@@ -1,7 +1,7 @@
 import {
   monthName, CUTOFF_DAY, OFFSETS, mod12, campaignOfMonth, CAMPAIGNS,
   allocateProduct, marketGoalTotal, warehouseGoalTotal,
-  kgToContainers, DEFAULT_COMPROMETIDO_PCT,
+  kgToContainers, DEFAULT_COMPROMETIDO_PCT, poolCapacity,
 } from '../model.js';
 
 /**
@@ -30,12 +30,17 @@ export function renderProducts({
   const cortes = [...new Set(mine.map((p) => p.startCorte))]
     .sort((a, b) => order(a, campaign) - order(b, campaign));
 
+  const poolById = Object.fromEntries((catalog?.pools || []).map((pl) => [pl.id, pl]));
+
   el.appendChild(header(campaign, globalPct, onGlobalPct, onManage));
   el.appendChild(rollup(mine, marketMetas, products, globalPct));
 
+  const camPools = (catalog?.pools || []).filter((pl) => Number(pl.campaign) === campaign);
+  if (camPools.length) el.appendChild(poolSummary(camPools, catalog, alloc));
+
   cortes.forEach((corte) => {
     const items = mine.filter((p) => p.startCorte === corte).sort((a, b) => a.name.localeCompare(b.name));
-    el.appendChild(corteCard(corte, campaign, items, catById, marketMetas, products, globalPct, onCap, onProductPct, onOverride));
+    el.appendChild(corteCard(corte, campaign, items, catById, poolById, marketMetas, products, globalPct, onCap, onProductPct, onOverride));
   });
 
   if (!mine.length) {
@@ -151,7 +156,36 @@ function rollup(mine, marketMetas, products, globalPct) {
   return wrap;
 }
 
-function corteCard(corte, campaign, items, catById, marketMetas, products, globalPct, onCap, onProductPct, onOverride) {
+function poolSummary(pools, catalog, alloc) {
+  const wrap = document.createElement('div');
+  const title = document.createElement('h3');
+  title.className = 'section-title';
+  title.textContent = 'Pools (meta combinada)';
+  wrap.appendChild(title);
+
+  const cards = document.createElement('div');
+  cards.className = 'prod-rollup';
+  pools.forEach((pl) => {
+    const cap = poolCapacity(catalog, alloc, pl.id);
+    const meta = Number(pl.meta) || 0;
+    const members = (catalog.products || []).filter((p) => p.pool === pl.id).length;
+    const fill = meta ? Math.round((cap / meta) * 100) : 0;
+    const card = document.createElement('div');
+    card.className = 'prod-rollup-card';
+    card.innerHTML =
+      `<div class="prod-rollup-name">${pl.name}</div>` +
+      `<div class="prod-rollup-bar">` +
+        `<span class="seg seg-base" style="flex:${Math.min(cap, meta) || 0}"></span>` +
+        `<span class="seg seg-gap" style="flex:${Math.max(0, meta - cap) || 0}"></span>` +
+      `</div>` +
+      `<div class="prod-rollup-meta">${fmtKg(cap)} cap${meta ? ` · meta ${fmtKg(meta)} · <strong class="tally tally--${cap >= meta ? 'exact' : 'under'}">${fill}%</strong>` : ' · sin meta'} · ${members} prod</div>`;
+    cards.appendChild(card);
+  });
+  wrap.appendChild(cards);
+  return wrap;
+}
+
+function corteCard(corte, campaign, items, catById, poolById, marketMetas, products, globalPct, onCap, onProductPct, onOverride) {
   const sampleMonth = mod12(corte + OFFSETS.corteToMuestra);
   const card = document.createElement('article');
   card.className = 'card prod-card';
@@ -168,13 +202,13 @@ function corteCard(corte, campaign, items, catById, marketMetas, products, globa
   const list = document.createElement('div');
   list.className = 'prod-items';
   items.forEach((p) => {
-    list.appendChild(productItem(p, catById, marketMetas, products, globalPct, onCap, onProductPct, onOverride));
+    list.appendChild(productItem(p, catById, poolById, marketMetas, products, globalPct, onCap, onProductPct, onOverride));
   });
   card.appendChild(list);
   return card;
 }
 
-function productItem(p, catById, marketMetas, products, globalPct, onCap, onProductPct, onOverride) {
+function productItem(p, catById, poolById, marketMetas, products, globalPct, onCap, onProductPct, onOverride) {
   const key = p.id;
   const entry = products[key] || {};
   const cap = Number(entry.cap) || 0;
@@ -193,6 +227,12 @@ function productItem(p, catById, marketMetas, products, globalPct, onCap, onProd
     tag.className = 'prod-cat-tag' + (cat.macro === 'mirc' ? ' is-mirc' : ' is-community');
     tag.textContent = cat.name;
     nameWrap.appendChild(tag);
+  }
+  if (p.pool && poolById[p.pool]) {
+    const ptag = document.createElement('span');
+    ptag.className = 'prod-cat-tag is-pool';
+    ptag.textContent = poolById[p.pool].name;
+    nameWrap.appendChild(ptag);
   }
   head.appendChild(nameWrap);
 

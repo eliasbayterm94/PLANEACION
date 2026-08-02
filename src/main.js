@@ -32,8 +32,9 @@ const state = {
   catalog: emptyCatalog(), // { categories, cortes, products }
   modalOpen: false,
   modalTab: 'cortes',
-  prodSel: new Set(), // product ids selected for bulk category assignment
+  prodSel: new Set(), // product ids selected for bulk assignment
   bulkCategory: '', // category to apply in bulk
+  bulkPool: '', // pool to apply in bulk
   status: '',
 };
 
@@ -188,15 +189,16 @@ function setOverride(key, market, kg) {
 }
 
 // --- Catalog mutations (categories, cortes per campaign, products) ----------
-/** Ensure every product has a single `category` string (migrate legacy shapes). */
+/** Ensure a single `category` string and a `pool` field per product; pools array. */
 function normalizeCatalog(cat) {
   return {
     ...cat,
+    pools: cat.pools || [],
     products: (cat.products || []).map((p) => {
       const { categories, ...rest } = p;
       let category = typeof p.category === 'string' ? p.category : '';
       if (!category && Array.isArray(categories) && categories.length) category = categories[0];
-      return { ...rest, category };
+      return { ...rest, category, pool: p.pool || '' };
     }),
   };
 }
@@ -206,6 +208,7 @@ function catalogCopy() {
   return {
     categories: (c.categories || []).map((x) => ({ ...x })),
     cortes: { 1: [...(c.cortes?.[1] || [])], 2: [...(c.cortes?.[2] || [])] },
+    pools: (c.pools || []).map((x) => ({ ...x })),
     products: (c.products || []).map((x) => ({ ...x })),
   };
 }
@@ -285,6 +288,37 @@ function bulkApplyCategory() {
   saveCatalogState(c, false);
 }
 
+function setBulkPool(id) { state.bulkPool = id; render(); }
+
+function bulkApplyPool() {
+  if (!state.prodSel.size) return;
+  const c = catalogCopy();
+  c.products.forEach((p) => { if (state.prodSel.has(p.id)) p.pool = state.bulkPool; });
+  state.prodSel = new Set();
+  saveCatalogState(c, false);
+}
+
+// --- Pool CRUD -------------------------------------------------------------
+function poolAdd(campaign) {
+  const c = catalogCopy();
+  c.pools.push({ id: `pool_${Date.now()}`, name: 'Nuevo pool', campaign: campaign || 1, meta: 0 });
+  saveCatalogState(c, false);
+}
+
+function poolUpdate(id, field, val) {
+  const c = catalogCopy();
+  const pool = c.pools.find((x) => x.id === id);
+  if (pool) pool[field] = val;
+  saveCatalogState(c, false);
+}
+
+function poolRemove(id) {
+  const c = catalogCopy();
+  c.pools = c.pools.filter((x) => x.id !== id);
+  c.products.forEach((p) => { if (p.pool === id) p.pool = ''; });
+  saveCatalogState(c, false);
+}
+
 function prodRemove(id) {
   const c = catalogCopy();
   c.products = c.products.filter((x) => x.id !== id);
@@ -313,10 +347,16 @@ function renderModal() {
     onProdRemove: prodRemove,
     selected: state.prodSel,
     bulkCategory: state.bulkCategory,
+    bulkPool: state.bulkPool,
     onToggleSelect: toggleProdSel,
     onSelectAll: selectProds,
     onBulkCategory: setBulkCategory,
     onBulkApply: bulkApplyCategory,
+    onBulkPool: setBulkPool,
+    onBulkApplyPool: bulkApplyPool,
+    onPoolAdd: poolAdd,
+    onPoolUpdate: poolUpdate,
+    onPoolRemove: poolRemove,
   }));
   const newBody = root.querySelector('.modal-body');
   if (newBody) newBody.scrollTop = scrollTop;

@@ -115,10 +115,16 @@ context and the country card shows salidas (kg) from its producing regions.
 The product catalogue is **editable** in the **Gestionar productos** modal
 (`catalogModal.js`, opened from the Campaña tabs), persisted as one row, scope
 `catalog`, slug `plan`: `{ categories: [{key,name,macro}], cortes: {1:[months],
-2:[months]}, products: [{id, name, category, startCorte}] }`. Seeds in
-`data/catalog.js` (products flattened from `products.js`). A product has **one**
-category; the modal supports **bulk** assignment (check several products, pick a
-category, apply). `normalizeCatalog` migrates legacy shapes on load.
+2:[months]}, pools: [{id,name,campaign,meta}], products: [{id, name, category,
+pool, startCorte}] }`. Seeds in `data/catalog.js` (products flattened from
+`products.js`). A product has **one** category and optionally **one pool**; the
+modal supports **bulk** assignment of both (check several products, pick a
+category or pool, apply). `normalizeCatalog` migrates legacy shapes on load.
+
+- **Pools:** a pool groups products sold together against **one combined kg
+  meta**, per campaign ("simple" mode — per-product capacity/allocation is
+  unchanged; the pool is an independent lens). The Campaña tabs show a **Pools**
+  summary (Σ member capacity vs pool meta, fill) and a pool tag per product.
 
 - **Categorías:** Community + MIRC subcategories (Microlot, Innovation, Reserve,
   Competition), each with a macro; editable.

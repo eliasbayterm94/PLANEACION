@@ -847,6 +847,26 @@
 }
 .prod-cat-tag.is-mirc { background: var(--fc-yellow); color: var(--fc-navy); }
 .prod-cat-tag.is-community { background: var(--fc-blue-100); color: var(--fc-blue-900); }
+.prod-cat-tag.is-pool { background: var(--fc-navy); color: var(--fc-yellow); }
+.seg-gap { background: var(--fc-ink-100); }
+
+/* Pool rows in the modal */
+.pool-row {
+  display: grid; grid-template-columns: 1fr 150px 130px 34px; align-items: center; gap: 10px;
+  padding: 6px 0 6px 8px; margin-bottom: 4px; border-left: 3px solid transparent;
+}
+.pool-row--head span {
+  font-family: var(--fc-font-display); font-size: 9px; font-weight: var(--fc-fw-bold);
+  letter-spacing: var(--fc-ls-eyebrow); text-transform: uppercase; color: var(--fc-ink-500);
+}
+
+/* Product name cell in the modal (name input + pool tag) */
+.prod-name-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.prod-pool-tag {
+  font-family: var(--fc-font-body); font-size: 9px; font-weight: var(--fc-fw-semibold);
+  color: var(--fc-yellow); background: var(--fc-navy);
+  padding: 1px 7px; border-radius: var(--fc-radius-1); align-self: flex-start;
+}
 
 /* --- Modal (Gestionar productos) ---------------------------------------- */
 .modal-backdrop {
@@ -986,11 +1006,13 @@
   }
   .prod-cat-row--head { display: none; }
   .prod-cat-row .prod-check { grid-column: 1; grid-row: 1; }
-  .prod-cat-row .metas-input { grid-column: 2; grid-row: 1; }
+  .prod-cat-row .prod-name-cell { grid-column: 2; grid-row: 1; }
   .prod-cat-row .wh-remove { grid-column: 3; grid-row: 1; }
   .prod-cat-row .cat-select { grid-column: 1 / -1; grid-row: 2; }
   .prod-cat-row .corte-select { grid-column: 1 / -1; grid-row: 3; }
 
+  .pool-row { grid-template-columns: 1fr 1fr 34px; }
+  .pool-row .metas-input:first-child { grid-column: 1 / -1; }
   .cat-row { grid-template-columns: 1fr 100px 30px; }
   .bulk-bar .wh-select { flex: 1; min-width: 140px; }
 }
