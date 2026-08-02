@@ -36,23 +36,28 @@ export const defaultCortes = {
 
 // Pools group products sold together against one combined kg meta, per campaign.
 // POOL_MITACA = Jun–Sep Innovation pool (Campaña 1); POOL_PRINCIPAL = Oct–Ene
-// Innovation pool (Campaña 2), the larger one.
+// Innovation pool (Campaña 2). POOL_RWANDA = the whole Rwanda campaign as one
+// Microlot aggregate (no per-product breakdown yet; meta and kg are one figure).
 const POOL_MITACA = 'pool_mitaca';
 const POOL_PRINCIPAL = 'pool_principal';
+const POOL_RWANDA = 'pool_rwanda';
 
 export const defaultPools = [
   { id: POOL_MITACA, name: 'Pool Innovation Campaña 1', campaign: 1, meta: 106220 },
   { id: POOL_PRINCIPAL, name: 'Pool Innovation Campaña 2', campaign: 2, meta: 184420 },
+  { id: POOL_RWANDA, name: 'Microlotes Rwanda', campaign: 3, meta: 115000 },
 ];
 
 /**
  * 2027 release list from the planning sheet (see the two campaign photos).
- * Rows: [name, category, startCorte (month index), pool id, kg].
+ * Rows: [name, category, startCorte (month index), pool id, kg, country?].
+ * `country` defaults to 'Colombia'; Rwanda products carry 'Rwanda'.
  * `kg` is the product's planned volume from the sheet, seeded as its Capacidad
  * (scope `alloc`). Pool members show 0 — the sheet only gives the pool's
  * combined kg (its meta), not a per-member split.
  * Campaña 2 (principal) cortes: primer=Oct(9), segundo=Nov(10), tercer=Dic(11), cuarto=Ene(0).
  * Campaña 1 (mitaca) cortes: primer=Jun(5), segundo=Jul(6), tercer=Ago(7), cuarto=Sep(8).
+ * Campaña Rwanda: one Microlot aggregate (meta = kg = 115.000), no product split yet.
  */
 const seedRows = [
   // ---- Campaña 2 — cosecha principal (Autumn / Christmas), ~300.000 kg ------
@@ -127,16 +132,19 @@ const seedRows = [
   ['Candy Blast', 'innovation', 5, POOL_MITACA, 0],
   ['Sumer Waves', 'innovation', 5, POOL_MITACA, 0],
   ['Pinneapple Ride', 'innovation', 5, POOL_MITACA, 0],
+
+  // ---- Campaña Rwanda — un solo agregado Microlot (meta = kg = 115.000) -----
+  ['Microlotes Rwanda', 'microlot', 4, POOL_RWANDA, 115000, 'Rwanda'],
 ];
 
 /** Products flattened from the release list; id = `${startCorte}::${name}`. */
-export const defaultProducts = seedRows.map(([name, category, startCorte, pool]) => ({
+export const defaultProducts = seedRows.map(([name, category, startCorte, pool, , country]) => ({
   id: `${startCorte}::${name}`,
   name,
   category,
   pool,
   startCorte,
-  country: 'Colombia', // Rwanda products (Campaña Rwanda) carry country 'Rwanda'
+  country: country || 'Colombia', // Rwanda products (Campaña Rwanda) carry 'Rwanda'
 }));
 
 /** Seed Capacidad (kg) per product id, from the sheet's kg column (>0 only). */
