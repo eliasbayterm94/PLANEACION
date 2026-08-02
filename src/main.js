@@ -1,14 +1,17 @@
 import { regions } from './data/regions.js';
 import { markets } from './data/markets.js';
 import { defaultWarehouses, emptyWarehouseConfig } from './data/warehouses.js';
+import { emptyCatalog } from './data/catalog.js';
 import {
   buildSchedules, CAMPAIGNS, YEAR, warehouseLeadLookup, emptyGoals,
-  DEFAULT_COMPROMETIDO_PCT,
+  DEFAULT_COMPROMETIDO_PCT, setCampaignCortes,
 } from './model.js';
 import {
-  loadPlan, saveWarehouse, saveShipment, saveGoals, saveAlloc, GOALS_SLUG, ALLOC_SLUG,
+  loadPlan, saveWarehouse, saveShipment, saveGoals, saveAlloc, saveCatalog,
+  GOALS_SLUG, ALLOC_SLUG, CATALOG_SLUG,
   subscribeToPlan, isRemote, editor, setEditor,
 } from './store.js';
+import { renderCatalogModal } from './views/catalogModal.js';
 import { renderMarket } from './views/market.js';
 import { renderConsolidado } from './views/consolidado.js';
 import { renderProducts } from './views/products.js';
@@ -25,7 +28,10 @@ const state = {
   shipments: {}, // { country: { ship: { wh: { monthIdx: containers } } } }
   warehouses: {}, // { marketSlug: { primary, warehouses: [{name, lead}] } }
   goals: emptyGoals(), // { markets, warehouses, countriesMIRC }
-  alloc: {}, // { productKey: { marketSlug: { base, libre, asegurado } } }
+  alloc: {}, // { pctComprometido, products: { productId: { cap, pct, ov } } }
+  catalog: emptyCatalog(), // { categories, cortes, products }
+  modalOpen: false,
+  modalTab: 'cortes',
   status: '',
 };
 
@@ -172,6 +178,92 @@ function setOverride(key, market, kg) {
   saveAllocState(a);
 }
 
+// --- Catalog mutations (categories, cortes per campaign, products) ----------
+function catalogCopy() {
+  const c = state.catalog;
+  return {
+    categories: (c.categories || []).map((x) => ({ ...x })),
+    cortes: { 1: [...(c.cortes?.[1] || [])], 2: [...(c.cortes?.[2] || [])] },
+    products: (c.products || []).map((x) => ({ ...x })),
+  };
+}
+
+function saveCatalogState(cat, cortesChanged) {
+  state.catalog = cat;
+  if (cortesChanged) setCampaignCortes(cat.cortes);
+  saveCatalog(cat, setStatus);
+  render();
+}
+
+function toggleCorte(camp, month) {
+  const c = catalogCopy();
+  const arr = c.cortes[camp];
+  const i = arr.indexOf(month);
+  if (i >= 0) arr.splice(i, 1);
+  else arr.push(month);
+  saveCatalogState(c, true);
+}
+
+function catAdd() {
+  const c = catalogCopy();
+  c.categories.push({ key: `cat_${Date.now()}`, name: 'Nueva categoría', macro: 'mirc' });
+  saveCatalogState(c, false);
+}
+
+function catUpdate(key, field, val) {
+  const c = catalogCopy();
+  const cat = c.categories.find((x) => x.key === key);
+  if (cat) cat[field] = val;
+  saveCatalogState(c, false);
+}
+
+function catRemove(key) {
+  const c = catalogCopy();
+  c.categories = c.categories.filter((x) => x.key !== key);
+  c.products.forEach((p) => { if (p.category === key) p.category = ''; });
+  saveCatalogState(c, false);
+}
+
+function prodAdd() {
+  const c = catalogCopy();
+  const start = c.cortes[1]?.[0] ?? c.cortes[2]?.[0] ?? 9;
+  c.products.push({ id: `p_${Date.now()}`, name: 'Nuevo producto', category: '', startCorte: start });
+  saveCatalogState(c, false);
+}
+
+function prodUpdate(id, field, val) {
+  const c = catalogCopy();
+  const p = c.products.find((x) => x.id === id);
+  if (p) p[field] = val;
+  saveCatalogState(c, false);
+}
+
+function prodRemove(id) {
+  const c = catalogCopy();
+  c.products = c.products.filter((x) => x.id !== id);
+  saveCatalogState(c, false);
+}
+
+function renderModal() {
+  const root = document.getElementById('modal-root');
+  if (!root) return;
+  root.innerHTML = '';
+  if (!state.modalOpen) return;
+  root.appendChild(renderCatalogModal({
+    catalog: state.catalog,
+    tab: state.modalTab,
+    onTab: (t) => { state.modalTab = t; render(); },
+    onClose: () => { state.modalOpen = false; render(); },
+    onToggleCorte: toggleCorte,
+    onCatAdd: catAdd,
+    onCatUpdate: catUpdate,
+    onCatRemove: catRemove,
+    onProdAdd: prodAdd,
+    onProdUpdate: prodUpdate,
+    onProdRemove: prodRemove,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 function closeDrawer() {
   document.getElementById('sidebar').classList.remove('open');
@@ -276,10 +368,12 @@ function renderView() {
       warehouses: state.warehouses,
       goals: state.goals,
       alloc: state.alloc,
+      catalog: state.catalog,
       onCap: (key, kg) => setCap(key, kg),
       onProductPct: (key, pct) => setProductPct(key, pct),
       onOverride: (key, market, kg) => setOverride(key, market, kg),
       onGlobalPct: (pct) => setGlobalPct(pct),
+      onManage: () => { state.modalOpen = true; state.modalTab = 'productos'; render(); },
     }));
   }
 }
@@ -287,6 +381,7 @@ function renderView() {
 function render() {
   renderNav();
   renderView();
+  renderModal();
   paintIcons();
 }
 
@@ -323,11 +418,14 @@ async function init() {
   const fromHash = location.hash.slice(1);
   if (fromHash && TABS.some((t) => t.id === fromHash)) state.view = fromHash;
 
-  const { warehouse, shipment, goals, alloc, error } = await loadPlan();
+  const { warehouse, shipment, goals, alloc, catalog, error } = await loadPlan();
   state.warehouses = buildWarehouses(warehouse);
   state.shipments = shipment || {};
   state.goals = goals?.[GOALS_SLUG] || emptyGoals();
   state.alloc = alloc?.[ALLOC_SLUG] || { pctComprometido: DEFAULT_COMPROMETIDO_PCT, products: {} };
+  const storedCatalog = catalog?.[CATALOG_SLUG];
+  state.catalog = storedCatalog && storedCatalog.products ? storedCatalog : emptyCatalog();
+  setCampaignCortes(state.catalog.cortes);
   if (error) setStatus('error', error);
 
   render();
@@ -337,6 +435,7 @@ async function init() {
     else if (scope === 'shipment') state.shipments[slug] = value;
     else if (scope === 'goals') state.goals = value;
     else if (scope === 'alloc') state.alloc = value;
+    else if (scope === 'catalog') { state.catalog = value; setCampaignCortes(value.cortes); }
     else return; // legacy region/market scopes are no longer rendered
     render();
   });

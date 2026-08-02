@@ -106,6 +106,23 @@ Persisted as a single row, scope `goals`, slug `plan`:
 Salidas are not yet split by category, so the market card shows llegadas (kg) as
 context and the country card shows salidas (kg) from its producing regions.
 
+### Catalogue management (Gestionar productos modal)
+
+The product catalogue is **editable** in the **Gestionar productos** modal
+(`catalogModal.js`, opened from the Campaña tabs), persisted as one row, scope
+`catalog`, slug `plan`: `{ categories: [{key,name,macro}], cortes: {1:[months],
+2:[months]}, products: [{id, name, category, startCorte}] }`. Seeds in
+`data/catalog.js` (products flattened from `products.js`).
+
+- **Categorías:** Community + MIRC subcategories (Microlot, Innovation, Reserve,
+  Competition), each with a macro; editable.
+- **Cortes por campaña:** the cutoff months per campaign. On load and on edit,
+  `setCampaignCortes(catalog.cortes)` in `model.js` overrides `CAMPAIGNS[n].cutoffMonths`
+  at runtime, so `campaignOfMonth` / bands / grouping across the app reflect the
+  edit — CAMPAIGNS stays the single source everything reads.
+- **Productos:** each product has a category and a **startCorte** (the cutoff it
+  is produced from; its campaign + colour derive from that month).
+
 ### Product allocation (Campaña tabs)
 
 The **Campaña 1 / 2** tabs (`products.js`) carry the commitment plan, **capacity
@@ -133,7 +150,8 @@ src/
     regions.js       harvest declarations + country (for the MIRC goal rollup)
     markets.js       targets and transit delays
     warehouses.js    destination warehouses + lead times (seed defaults)
-    products.js      catalogue keyed by cutoff month
+    products.js      raw release catalogue (seed source for catalog.js)
+    catalog.js       editable catalogue seeds: categories, cortes, products
   views/
     consolidado.js   flow + salidas by country + llegadas by market
     programacion.js  salidas cockpit: country tab, market→warehouse, valle/meta
@@ -141,7 +159,8 @@ src/
     cosechas.js      read-only Gantt of every origin at once ("Cosechas" tab)
     market.js        per-market arrivals (derived, read-only)
     bodegas.js       edit warehouses + lead times per destination ("Bodegas" tab)
-    products.js      releases per cutoff + Base/Libre/Asegurado allocation
+    products.js      catalogue-driven capacity allocation (Campaña tabs)
+    catalogModal.js  "Gestionar productos": categories, cortes, products
   main.js            router, tabs, state
   forest-design-system.css  Forest Design System v1.0 (shell, tokens)
   styles.css         planning calendar + cards on the Forest light theme

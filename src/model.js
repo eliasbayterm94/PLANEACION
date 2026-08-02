@@ -94,6 +94,18 @@ export function buildSchedules(regions) {
   return regions.map(buildSchedule);
 }
 
+/**
+ * Override the cutoff months per campaign at runtime, from the editable catalog.
+ * CAMPAIGNS stays the single source `campaignOfMonth` / bands / grouping read,
+ * so updating it here reflects everywhere without threading state through views.
+ */
+export function setCampaignCortes(cortes = {}) {
+  Object.keys(CAMPAIGNS).forEach((c) => {
+    const months = cortes[c];
+    if (Array.isArray(months)) CAMPAIGNS[c].cutoffMonths = months.map(mod12);
+  });
+}
+
 /** Which campaign a given cutoff month belongs to. */
 export function campaignOfMonth(m) {
   const hit = Object.entries(CAMPAIGNS).find(([, c]) => c.cutoffMonths.includes(mod12(m)));
