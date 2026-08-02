@@ -101,8 +101,12 @@ Goals are kg targets, edited in the **Metas** tab, on **two different axes**:
 - **MIRC by producing country** — a country-level MIRC target (`region.country`;
   today Colombia and Rwanda). Community has no country target (demand-driven).
 
+- **Company-level general goal** — a total kg per category (`company: {community,
+  mirc}`), shown at the top of Metas with reconciliation chips comparing it to the
+  sum of market goals (demand) and, for MIRC, the country targets (supply).
+
 Persisted as a single row, scope `goals`, slug `plan`:
-`{ markets: { slug: { community, mirc } }, warehouses: { whName: { community, mirc } }, countriesMIRC: { country: kg } }`.
+`{ company: { community, mirc }, markets: { slug: { community, mirc } }, warehouses: { whName: { community, mirc } }, countriesMIRC: { country: kg } }`.
 Salidas are not yet split by category, so the market card shows llegadas (kg) as
 context and the country card shows salidas (kg) from its producing regions.
 

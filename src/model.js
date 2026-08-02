@@ -378,7 +378,7 @@ export const GOAL_CATEGORIES = [
  * the market has `goalsByWarehouse`. The MIRC country target lives on the
  * producing country (region.country).
  */
-export const emptyGoals = () => ({ markets: {}, warehouses: {}, countriesMIRC: {} });
+export const emptyGoals = () => ({ company: {}, markets: {}, warehouses: {}, countriesMIRC: {} });
 
 /** Distinct producing countries, in declaration order. */
 export function listCountries(regions = []) {
@@ -409,6 +409,27 @@ export function warehouseGoalTotal(goals, whName) {
 /** Containers landing in one warehouse, across all regions' shipments. */
 export function warehouseAllocatedAll(shipments, whName) {
   return Object.values(shipments || {}).reduce((s, rs) => s + warehouseAllocated(rs, whName), 0);
+}
+
+/** Company-level goal for a category (Community / MIRC), in kg. */
+export function companyGoal(goals, category) {
+  return Number(goals?.company?.[category]) || 0;
+}
+
+/** Sum of the market-level (sales) goals for a category, across all markets. */
+export function companyMarketTotal(goals, markets, warehouses, category) {
+  return markets.reduce((s, mk) => {
+    if (mk.goalsByWarehouse) {
+      return s + (warehouses[mk.slug]?.warehouses || [])
+        .reduce((a, w) => a + warehouseGoal(goals, w.name, category), 0);
+    }
+    return s + marketGoal(goals, mk.slug, category);
+  }, 0);
+}
+
+/** Sum of the MIRC country targets (supply side). */
+export function companyCountryMirc(goals) {
+  return Object.values(goals?.countriesMIRC || {}).reduce((a, b) => a + (Number(b) || 0), 0);
 }
 
 /** Containers shipped from a producing country's regions (all warehouses). */

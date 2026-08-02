@@ -106,10 +106,17 @@ function saveGoalsState(value) {
 
 function goalsCopy() {
   return {
+    company: { ...(state.goals.company || {}) },
     markets: { ...(state.goals.markets || {}) },
     warehouses: { ...(state.goals.warehouses || {}) },
     countriesMIRC: { ...(state.goals.countriesMIRC || {}) },
   };
+}
+
+function setCompanyGoal(category, kg) {
+  const g = goalsCopy();
+  g.company[category] = kg;
+  saveGoalsState(g);
 }
 
 function setMarketGoal(marketSlug, category, kg) {
@@ -380,6 +387,7 @@ function renderView() {
       onMarketGoal: (slug, category, kg) => setMarketGoal(slug, category, kg),
       onWarehouseGoal: (wh, category, kg) => setWarehouseGoal(wh, category, kg),
       onCountryMirc: (country, kg) => setCountryMirc(country, kg),
+      onCompanyGoal: (category, kg) => setCompanyGoal(category, kg),
     }));
   } else if (kind === 'programacion') {
     root.appendChild(renderProgramacion({

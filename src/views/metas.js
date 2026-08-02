@@ -1,6 +1,7 @@
 import {
   listCountries, marketGoal, marketGoalTotal, warehouseGoal, warehouseGoalTotal,
   countrySalidasTotal, marketShipmentArrivals, warehouseAllocatedAll, containersToKg,
+  companyGoal, companyMarketTotal, companyCountryMirc,
 } from '../model.js';
 
 /**
@@ -16,13 +17,88 @@ import {
  * split by category.
  */
 export function renderMetas({
-  schedules, markets, warehouses, goals, shipments, leadLookup, onMarketGoal, onWarehouseGoal, onCountryMirc,
+  schedules, markets, warehouses, goals, shipments, leadLookup,
+  onMarketGoal, onWarehouseGoal, onCountryMirc, onCompanyGoal,
 }) {
   const el = document.createElement('div');
   el.appendChild(header());
+  el.appendChild(companyCard(markets, warehouses, goals, onCompanyGoal));
   el.appendChild(marketCard(markets, warehouses, goals, shipments, leadLookup, onMarketGoal, onWarehouseGoal));
   el.appendChild(countryCard(schedules, goals, shipments, leadLookup, onCountryMirc));
   return el;
+}
+
+/** Company-level general goal (Community + MIRC), reconciled with the breakdowns. */
+function companyCard(markets, warehouses, goals, onCompanyGoal) {
+  const card = document.createElement('section');
+  card.className = 'wh-card';
+
+  const head = document.createElement('div');
+  head.className = 'wh-card-head';
+  head.innerHTML = '<span class="wh-card-title">Meta general — compañía</span>';
+  card.appendChild(head);
+
+  const intro = document.createElement('p');
+  intro.className = 'view-sub';
+  intro.innerHTML = 'La meta total en kg de la compañía. Debajo se compara contra la suma de las metas por mercado (demanda) y, en MIRC, por país (abastecimiento) para ver que cuadre.';
+  card.appendChild(intro);
+
+  const rows = [
+    { cat: 'community', label: 'Community' },
+    { cat: 'mirc', label: 'MIRC' },
+  ];
+
+  rows.forEach(({ cat, label }) => {
+    const company = companyGoal(goals, cat);
+    const mkTotal = companyMarketTotal(goals, markets, warehouses, cat);
+
+    const row = document.createElement('div');
+    row.className = 'company-row';
+
+    const name = document.createElement('span');
+    name.className = 'company-cat';
+    name.textContent = label;
+    row.appendChild(name);
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0'; input.step = '1000';
+    input.className = 'metas-input company-input';
+    input.value = company || '';
+    input.placeholder = '0';
+    input.setAttribute('aria-label', `Meta compañía ${label} en kg`);
+    input.addEventListener('change', (e) => onCompanyGoal(cat, Math.max(0, Number(e.target.value) || 0)));
+    row.appendChild(input);
+
+    const recon = document.createElement('span');
+    recon.className = 'company-recon';
+    recon.appendChild(chip('Mercados', mkTotal, company));
+    if (cat === 'mirc') {
+      recon.appendChild(chip('Países', companyCountryMirc(goals), company));
+    }
+    row.appendChild(recon);
+
+    card.appendChild(row);
+  });
+
+  const total = companyGoal(goals, 'community') + companyGoal(goals, 'mirc');
+  const foot = document.createElement('p');
+  foot.className = 'metas-foot';
+  foot.innerHTML = `Total compañía: <strong>${fmtKg(total)}</strong>`;
+  card.appendChild(foot);
+
+  return card;
+}
+
+/** A reconciliation chip: label + sum, coloured vs the company target. */
+function chip(label, sum, target) {
+  const span = document.createElement('span');
+  const diff = sum - target;
+  const state = !target ? 'mute' : diff === 0 ? 'ok' : 'off';
+  span.className = `recon-chip recon-chip--${state}`;
+  const delta = target && diff !== 0 ? ` (${diff > 0 ? '+' : ''}${fmtKg(diff)})` : '';
+  span.textContent = `${label} ${fmtKg(sum)}${delta}`;
+  return span;
 }
 
 function header() {
