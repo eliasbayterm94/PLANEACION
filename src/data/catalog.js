@@ -5,9 +5,10 @@
  * in the "Gestionar productos" modal and persisted (scope `catalog`). These are
  * only the defaults shown before anyone edits.
  *
- * A product declares its CATEGORIES (zero or more) and its START cutoff
- * (`startCorte`, a month index) — the corte it becomes available from, tied to
- * production. Its campaign and colour derive from that cutoff.
+ * A product declares its CATEGORY (one) and its START cutoff (`startCorte`, a
+ * month index) — the corte it becomes available from, tied to production. Its
+ * campaign and colour derive from that cutoff. Categories can be applied in bulk
+ * (select several products, apply one category) from the modal.
  */
 import { productReleases } from './products.js';
 
@@ -31,7 +32,7 @@ export const defaultProducts = productReleases.flatMap((r) =>
   r.items.map((name) => ({
     id: `${r.cutoffMonth}::${name}`,
     name,
-    categories: [], // zero or more — assign in the modal
+    category: '', // one category — assign (in bulk) from the modal
     startCorte: r.cutoffMonth,
   })),
 );

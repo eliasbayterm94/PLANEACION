@@ -12,7 +12,8 @@ import { MONTHS, monthName, campaignOfMonth, CAMPAIGNS } from '../model.js';
 export function renderCatalogModal({
   catalog, tab, onTab, onClose,
   onToggleCorte, onCatAdd, onCatUpdate, onCatRemove,
-  onProdAdd, onProdUpdate, onProdToggleCategory, onProdRemove,
+  onProdAdd, onProdUpdate, onProdRemove,
+  selected, bulkCategory, onToggleSelect, onSelectAll, onBulkCategory, onBulkApply,
 }) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -53,7 +54,11 @@ export function renderCatalogModal({
   body.className = 'modal-body';
   if (tab === 'cortes') body.appendChild(cortesSection(catalog, onToggleCorte));
   else if (tab === 'categorias') body.appendChild(categoriesSection(catalog, onCatAdd, onCatUpdate, onCatRemove));
-  else body.appendChild(productsSection(catalog, onProdAdd, onProdUpdate, onProdToggleCategory, onProdRemove));
+  else body.appendChild(productsSection(catalog, {
+    onProdAdd, onProdUpdate, onProdRemove,
+    selected: selected || new Set(), bulkCategory: bulkCategory || '',
+    onToggleSelect, onSelectAll, onBulkCategory, onBulkApply,
+  }));
   panel.appendChild(body);
 
   backdrop.appendChild(panel);
@@ -157,26 +162,80 @@ function corteOptions(catalog, currentStart) {
   return opts;
 }
 
-function productsSection(catalog, onProdAdd, onProdUpdate, onProdToggleCategory, onProdRemove) {
+function productsSection(catalog, cb) {
+  const {
+    onProdAdd, onProdUpdate, onProdRemove,
+    selected, bulkCategory, onToggleSelect, onSelectAll, onBulkCategory, onBulkApply,
+  } = cb;
+  const cats = catalog.categories || [];
+  const sorted = [...(catalog.products || [])].sort((a, b) => a.startCorte - b.startCorte || a.name.localeCompare(b.name));
+  const ids = sorted.map((p) => p.id);
+
   const wrap = document.createElement('div');
   const intro = document.createElement('p');
   intro.className = 'view-sub';
-  intro.innerHTML = 'Cada producto: nombre, <strong>categorías</strong> (selección múltiple) y <strong>corte de inicio</strong> (desde qué corte se produce; define su campaña y color).';
+  intro.innerHTML = 'Selecciona varios productos y aplícales una <strong>categoría</strong> en lote. Cada producto tiene una categoría y un <strong>corte de inicio</strong> (define su campaña y color).';
   wrap.appendChild(intro);
 
+  // Bulk action bar
+  const bulk = document.createElement('div');
+  bulk.className = 'bulk-bar';
+  const count = document.createElement('span');
+  count.className = 'bulk-count';
+  count.textContent = `${selected.size} seleccionado${selected.size === 1 ? '' : 's'}`;
+  bulk.appendChild(count);
+
+  const sel = document.createElement('select');
+  sel.className = 'wh-select';
+  const ph = document.createElement('option'); ph.value = ''; ph.textContent = '— categoría —';
+  if (!bulkCategory) ph.selected = true; sel.appendChild(ph);
+  cats.forEach((c) => {
+    const o = document.createElement('option');
+    o.value = c.key; o.textContent = `${c.name} (${c.macro === 'mirc' ? 'MIRC' : 'Community'})`;
+    if (bulkCategory === c.key) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.addEventListener('change', (e) => onBulkCategory(e.target.value));
+  bulk.appendChild(sel);
+
+  const apply = document.createElement('button');
+  apply.type = 'button';
+  apply.className = 'fc-btn fc-btn-primary bulk-apply';
+  apply.textContent = 'Aplicar a seleccionados';
+  apply.disabled = !selected.size;
+  apply.addEventListener('click', () => onBulkApply());
+  bulk.appendChild(apply);
+  wrap.appendChild(bulk);
+
+  // Header with select-all
   const heads = document.createElement('div');
   heads.className = 'prod-cat-row prod-cat-row--head';
-  heads.innerHTML = '<span>Producto</span><span>Categorías</span><span>Corte de inicio</span><span></span>';
+  const allOn = ids.length > 0 && ids.every((id) => selected.has(id));
+  const selAll = document.createElement('input');
+  selAll.type = 'checkbox';
+  selAll.className = 'prod-check';
+  selAll.checked = allOn;
+  selAll.setAttribute('aria-label', 'Seleccionar todos');
+  selAll.addEventListener('change', (e) => onSelectAll(ids, e.target.checked));
+  heads.appendChild(selAll);
+  ['Producto', 'Categoría', 'Corte de inicio', ''].forEach((t) => {
+    const s = document.createElement('span'); s.textContent = t; heads.appendChild(s);
+  });
   wrap.appendChild(heads);
-
-  const cats = catalog.categories || [];
-  const sorted = [...(catalog.products || [])].sort((a, b) => a.startCorte - b.startCorte || a.name.localeCompare(b.name));
 
   sorted.forEach((p) => {
     const row = document.createElement('div');
-    row.className = 'prod-cat-row';
+    row.className = 'prod-cat-row' + (selected.has(p.id) ? ' is-selected' : '');
     const camp = campaignOfMonth(p.startCorte);
     if (camp) row.classList.add(`prod-cat-row--c${camp}`);
+
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.className = 'prod-check';
+    check.checked = selected.has(p.id);
+    check.setAttribute('aria-label', `Seleccionar ${p.name}`);
+    check.addEventListener('change', () => onToggleSelect(p.id));
+    row.appendChild(check);
 
     const name = document.createElement('input');
     name.type = 'text';
@@ -186,21 +245,18 @@ function productsSection(catalog, onProdAdd, onProdUpdate, onProdToggleCategory,
     name.addEventListener('change', (e) => onProdUpdate(p.id, 'name', e.target.value.trim() || p.name));
     row.appendChild(name);
 
-    const selected = new Set(p.categories || []);
-    const chips = document.createElement('div');
-    chips.className = 'prod-cat-chips';
+    const cat = document.createElement('select');
+    cat.className = 'wh-select';
+    const none = document.createElement('option'); none.value = ''; none.textContent = '— sin categoría —';
+    if (!p.category) none.selected = true; cat.appendChild(none);
     cats.forEach((c) => {
-      const on = selected.has(c.key);
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'catsel-chip' + (on ? ` on ${c.macro === 'mirc' ? 'is-mirc' : 'is-community'}` : '');
-      chip.textContent = c.name;
-      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
-      chip.title = c.macro === 'mirc' ? 'MIRC' : 'Community';
-      chip.addEventListener('click', () => onProdToggleCategory(p.id, c.key));
-      chips.appendChild(chip);
+      const o = document.createElement('option');
+      o.value = c.key; o.textContent = `${c.name} (${c.macro === 'mirc' ? 'MIRC' : 'Community'})`;
+      if (p.category === c.key) o.selected = true;
+      cat.appendChild(o);
     });
-    row.appendChild(chips);
+    cat.addEventListener('change', (e) => onProdUpdate(p.id, 'category', e.target.value));
+    row.appendChild(cat);
 
     const corte = document.createElement('select');
     corte.className = 'wh-select';

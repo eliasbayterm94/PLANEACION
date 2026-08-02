@@ -32,6 +32,8 @@ const state = {
   catalog: emptyCatalog(), // { categories, cortes, products }
   modalOpen: false,
   modalTab: 'cortes',
+  prodSel: new Set(), // product ids selected for bulk category assignment
+  bulkCategory: '', // category to apply in bulk
   status: '',
 };
 
@@ -179,14 +181,16 @@ function setOverride(key, market, kg) {
 }
 
 // --- Catalog mutations (categories, cortes per campaign, products) ----------
-/** Ensure every product has a `categories` array (migrate legacy `category`). */
+/** Ensure every product has a single `category` string (migrate legacy shapes). */
 function normalizeCatalog(cat) {
   return {
     ...cat,
-    products: (cat.products || []).map((p) => ({
-      ...p,
-      categories: Array.isArray(p.categories) ? p.categories : (p.category ? [p.category] : []),
-    })),
+    products: (cat.products || []).map((p) => {
+      const { categories, ...rest } = p;
+      let category = typeof p.category === 'string' ? p.category : '';
+      if (!category && Array.isArray(categories) && categories.length) category = categories[0];
+      return { ...rest, category };
+    }),
   };
 }
 
@@ -195,7 +199,7 @@ function catalogCopy() {
   return {
     categories: (c.categories || []).map((x) => ({ ...x })),
     cortes: { 1: [...(c.cortes?.[1] || [])], 2: [...(c.cortes?.[2] || [])] },
-    products: (c.products || []).map((x) => ({ ...x, categories: [...(x.categories || [])] })),
+    products: (c.products || []).map((x) => ({ ...x })),
   };
 }
 
@@ -231,14 +235,14 @@ function catUpdate(key, field, val) {
 function catRemove(key) {
   const c = catalogCopy();
   c.categories = c.categories.filter((x) => x.key !== key);
-  c.products.forEach((p) => { p.categories = (p.categories || []).filter((k) => k !== key); });
+  c.products.forEach((p) => { if (p.category === key) p.category = ''; });
   saveCatalogState(c, false);
 }
 
 function prodAdd() {
   const c = catalogCopy();
   const start = c.cortes[1]?.[0] ?? c.cortes[2]?.[0] ?? 9;
-  c.products.push({ id: `p_${Date.now()}`, name: 'Nuevo producto', categories: [], startCorte: start });
+  c.products.push({ id: `p_${Date.now()}`, name: 'Nuevo producto', category: '', startCorte: start });
   saveCatalogState(c, false);
 }
 
@@ -249,15 +253,28 @@ function prodUpdate(id, field, val) {
   saveCatalogState(c, false);
 }
 
-function prodToggleCategory(id, catKey) {
+// --- Bulk category assignment (select several products, apply one category) ---
+function toggleProdSel(id) {
+  if (state.prodSel.has(id)) state.prodSel.delete(id);
+  else state.prodSel.add(id);
+  render();
+}
+
+function selectProds(ids, on) {
+  ids.forEach((id) => { if (on) state.prodSel.add(id); else state.prodSel.delete(id); });
+  render();
+}
+
+function setBulkCategory(key) {
+  state.bulkCategory = key;
+  render();
+}
+
+function bulkApplyCategory() {
+  if (!state.prodSel.size) return;
   const c = catalogCopy();
-  const p = c.products.find((x) => x.id === id);
-  if (p) {
-    const set = new Set(p.categories || []);
-    if (set.has(catKey)) set.delete(catKey);
-    else set.add(catKey);
-    p.categories = [...set];
-  }
+  c.products.forEach((p) => { if (state.prodSel.has(p.id)) p.category = state.bulkCategory; });
+  state.prodSel = new Set();
   saveCatalogState(c, false);
 }
 
@@ -283,8 +300,13 @@ function renderModal() {
     onCatRemove: catRemove,
     onProdAdd: prodAdd,
     onProdUpdate: prodUpdate,
-    onProdToggleCategory: prodToggleCategory,
     onProdRemove: prodRemove,
+    selected: state.prodSel,
+    bulkCategory: state.bulkCategory,
+    onToggleSelect: toggleProdSel,
+    onSelectAll: selectProds,
+    onBulkCategory: setBulkCategory,
+    onBulkApply: bulkApplyCategory,
   }));
 }
 

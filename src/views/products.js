@@ -187,12 +187,13 @@ function productItem(p, catById, marketMetas, products, globalPct, onCap, onProd
   const nameWrap = document.createElement('span');
   nameWrap.className = 'prod-item-name';
   nameWrap.textContent = p.name;
-  (p.categories || []).map((k) => catById[k]).filter(Boolean).forEach((cat) => {
+  const cat = catById[p.category];
+  if (cat) {
     const tag = document.createElement('span');
     tag.className = 'prod-cat-tag' + (cat.macro === 'mirc' ? ' is-mirc' : ' is-community');
     tag.textContent = cat.name;
     nameWrap.appendChild(tag);
-  });
+  }
   head.appendChild(nameWrap);
 
   const capInput = document.createElement('input');
