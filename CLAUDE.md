@@ -52,11 +52,12 @@ this, with a Sep cutoff in one window and Oct–Ene in the other. Never add a
 `campaign` field to a region; use `primaryCampaign(schedule)` for grouping and
 colour only.
 
-**Open question for Elias:** confirm which window is called "Campaña 1". The
-code currently uses Campaña 1 = Oct/Nov/Dic/Ene cutoffs (main crop), Campaña 2 =
-Jun/Jul/Ago/Sep (mitaca). The original prototype's footer said this; its data
-array said the opposite. If the intended meaning is reversed, swap
-`cutoffMonths` in `CAMPAIGNS` — nothing else needs to change.
+**Campaign naming (confirmed by Elias):** Campaña 1 = Jun/Jul/Ago/Sep cutoffs
+(mitaca, the smaller crop, ~200.000 kg); Campaña 2 = Oct/Nov/Dic/Ene cutoffs
+(cosecha principal, the larger one, ~300.000 kg). Colour tracks the crop, so the
+principal (Campaña 2) is brand yellow and the mitaca (Campaña 1) is brand blue —
+each month keeps the calendar colour it always had; only the number label
+changed. Both `CAMPAIGNS` and the seed `catalog.cortes` encode this.
 
 **Second open question:** `NO_ARRIVAL_MONTHS` (Abr–Jul) is defined on the
 standard Colombia lane. With `arrivalDelay: 1`, MENA and AU shift one month
@@ -214,8 +215,8 @@ with no backend.
   no gradients, display text uppercase + wide-tracked, numbers monospace, and
   the **closed palette** (yellow / blue / navy / ink / paper).
 - **Campaign colour = closed palette.** The team's mental map survives, remapped
-  to the brand: Campaña 1 (main crop) = brand yellow, Campaña 2 (mitaca) = brand
-  blue. Region tints are light shades of the same palette; region identity is
+  to the brand: the cosecha principal (Campaña 2) = brand yellow, the mitaca
+  (Campaña 1) = brand blue. Region tints are light shades of the same palette; region identity is
   carried by the row label, colour is a secondary cue. Colours live only in
   `model.js` (`CAMPAIGNS`) and `data/regions.js`.
 - Vanilla JS + Vite. No framework — deliberate, matches the CTRM and quote

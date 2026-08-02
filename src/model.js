@@ -37,16 +37,16 @@ export const CUTOFF_DAY = 15;
  * A region can feed the tail of one campaign and the body of the next
  * (Huila Sur does exactly this), so campaign is a property of the cutoff.
  *
- * NOTE FOR ELIAS: confirm this naming. Campaign 1 = main crop (Oct-Ene
- * cutoffs), Campaign 2 = mitaca/traviesa (Jun-Sep cutoffs). The original
- * prototype's footer used this convention; its `regions` array used the
- * inverse. Flip `cutoffMonths` below if the intended meaning is reversed.
+ * NAMING (confirmed by Elias): Campaña 1 = mitaca/traviesa (Jun-Sep cutoffs,
+ * the smaller crop); Campaña 2 = cosecha principal (Oct-Ene cutoffs, the larger
+ * one in kg). Flip `cutoffMonths` below if this ever reverses.
  */
 // Colours follow the Forest design system closed palette (design system rule 6):
-// Campaña 1 (main crop) = brand yellow, Campaña 2 (mitaca) = brand blue.
+// the main crop (now Campaña 2) = brand yellow, the mitaca (Campaña 1) = brand
+// blue — colour tracks the crop so each month keeps its calendar colour.
 export const CAMPAIGNS = {
-  1: { name: 'Campaña 1', cutoffMonths: [9, 10, 11, 0], color: '#e7e244' },
-  2: { name: 'Campaña 2', cutoffMonths: [5, 6, 7, 8], color: '#95b5ce' },
+  1: { name: 'Campaña 1', cutoffMonths: [5, 6, 7, 8], color: '#95b5ce' },
+  2: { name: 'Campaña 2', cutoffMonths: [9, 10, 11, 0], color: '#e7e244' },
 };
 
 /** Months in which nothing lands anywhere. Complement of the delivery calendar. */

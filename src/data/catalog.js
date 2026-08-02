@@ -21,29 +21,35 @@ export const defaultCategories = [
   { key: 'competition', name: 'Competition', macro: 'mirc' },
 ];
 
-/** Cutoff months per campaign (seed = current model). */
+/**
+ * Cutoff months per campaign.
+ * Campaña 1 = mitaca (Jun–Sep, the smaller crop).
+ * Campaña 2 = cosecha principal (Oct–Ene, the larger one in kg).
+ */
 export const defaultCortes = {
-  1: [9, 10, 11, 0], // Oct, Nov, Dic, Ene  → primer, segundo, tercer, cuarto
-  2: [5, 6, 7, 8], // Jun, Jul, Ago, Sep  → primer, segundo, tercer, cuarto
+  1: [5, 6, 7, 8], // Jun, Jul, Ago, Sep  → primer, segundo, tercer, cuarto
+  2: [9, 10, 11, 0], // Oct, Nov, Dic, Ene  → primer, segundo, tercer, cuarto
 };
 
 // Pools group products sold together against one combined kg meta, per campaign.
-const POOL_C1 = 'pool_c1';
-const POOL_C2 = 'pool_c2';
+// POOL_MITACA = Jun–Sep Innovation pool (Campaña 1); POOL_PRINCIPAL = Oct–Ene
+// Innovation pool (Campaña 2), the larger one.
+const POOL_MITACA = 'pool_mitaca';
+const POOL_PRINCIPAL = 'pool_principal';
 
 export const defaultPools = [
-  { id: POOL_C1, name: 'Pool Innovation Campaña 1', campaign: 1, meta: 184420 },
-  { id: POOL_C2, name: 'Pool Innovation Campaña 2', campaign: 2, meta: 106220 },
+  { id: POOL_MITACA, name: 'Pool Innovation Campaña 1', campaign: 1, meta: 106220 },
+  { id: POOL_PRINCIPAL, name: 'Pool Innovation Campaña 2', campaign: 2, meta: 184420 },
 ];
 
 /**
  * 2027 release list from the planning sheet (see the two campaign photos).
  * Rows: [name, category, startCorte (month index), pool id].
- * Campaña 1 cortes: primer=Oct(9), segundo=Nov(10), tercer=Dic(11), cuarto=Ene(0).
- * Campaña 2 cortes: primer=Jun(5), segundo=Jul(6), tercer=Ago(7), cuarto=Sep(8).
+ * Campaña 2 (principal) cortes: primer=Oct(9), segundo=Nov(10), tercer=Dic(11), cuarto=Ene(0).
+ * Campaña 1 (mitaca) cortes: primer=Jun(5), segundo=Jul(6), tercer=Ago(7), cuarto=Sep(8).
  */
 const seedRows = [
-  // ---- Campaña 1 — cosecha principal (Autumn / Christmas) ------------------
+  // ---- Campaña 2 — cosecha principal (Autumn / Christmas), ~300.000 kg ------
   // Microlots
   ['Guava Banana', 'microlot', 9, ''],
   ['Natural Guamo', 'microlot', 9, ''],
@@ -66,19 +72,19 @@ const seedRows = [
   ['Sidra Koji', 'innovation', 0, ''],
   ['Rocket Flower', 'innovation', 0, ''],
   ['Magnum Sidra', 'innovation', 0, ''],
-  // Innovation — Pool Campaña 1 (meta combinada 184.420 kg)
-  ['Vanilla Heaven', 'innovation', 11, POOL_C1],
-  ['Cinnamon', 'innovation', 0, POOL_C1],
-  ['Christmas #1 Special Edition', 'innovation', 0, POOL_C1],
-  ['Christmas #2 Special Edition', 'innovation', 0, POOL_C1],
-  ['Sunrise Pocket', 'innovation', 0, POOL_C1],
-  ['Galactic Crumble', 'innovation', 9, POOL_C1],
-  ['Apple Explosion', 'innovation', 9, POOL_C1],
-  ['Juicy Strawberry', 'innovation', 9, POOL_C1],
-  ['Juicy Grape', 'innovation', 9, POOL_C1],
-  ['NEW CRAZY INFUSED', 'innovation', 11, POOL_C1],
+  // Innovation — Pool Campaña 2 / principal (meta combinada 184.420 kg)
+  ['Vanilla Heaven', 'innovation', 11, POOL_PRINCIPAL],
+  ['Cinnamon', 'innovation', 0, POOL_PRINCIPAL],
+  ['Christmas #1 Special Edition', 'innovation', 0, POOL_PRINCIPAL],
+  ['Christmas #2 Special Edition', 'innovation', 0, POOL_PRINCIPAL],
+  ['Sunrise Pocket', 'innovation', 0, POOL_PRINCIPAL],
+  ['Galactic Crumble', 'innovation', 9, POOL_PRINCIPAL],
+  ['Apple Explosion', 'innovation', 9, POOL_PRINCIPAL],
+  ['Juicy Strawberry', 'innovation', 9, POOL_PRINCIPAL],
+  ['Juicy Grape', 'innovation', 9, POOL_PRINCIPAL],
+  ['NEW CRAZY INFUSED', 'innovation', 11, POOL_PRINCIPAL],
 
-  // ---- Campaña 2 — mitaca (Spring / Summer) --------------------------------
+  // ---- Campaña 1 — mitaca (Spring / Summer), ~200.000 kg -------------------
   // Microlots
   ['Bubble Gum', 'microlot', 5, ''],
   ['Decaf Natural', 'microlot', 5, ''],
@@ -103,18 +109,18 @@ const seedRows = [
   ['Java Koji', 'innovation', 7, ''],
   // Reserve (corte en blanco en la hoja → primer corte por defecto)
   ['Vergel Reserve', 'reserve', 5, ''],
-  // Innovation — Pool Campaña 2 (meta combinada 106.220 kg; cortes en blanco → primer corte)
-  ['Red Symphony', 'innovation', 5, POOL_C2],
-  ['Juicy Grape', 'innovation', 5, POOL_C2],
-  ['Juicy Passion Fruit', 'innovation', 5, POOL_C2],
-  ['Juicy Strawberry', 'innovation', 5, POOL_C2],
-  ['Tropical Splash', 'innovation', 5, POOL_C2],
-  ['Kiwilu', 'innovation', 5, POOL_C2],
-  ['Vergel Flowers', 'innovation', 6, POOL_C2],
-  ['Galactic Crumble', 'innovation', 5, POOL_C2],
-  ['Candy Blast', 'innovation', 5, POOL_C2],
-  ['Sumer Waves', 'innovation', 5, POOL_C2],
-  ['Pinneapple Ride', 'innovation', 5, POOL_C2],
+  // Innovation — Pool Campaña 1 / mitaca (meta combinada 106.220 kg; cortes en blanco → primer corte)
+  ['Red Symphony', 'innovation', 5, POOL_MITACA],
+  ['Juicy Grape', 'innovation', 5, POOL_MITACA],
+  ['Juicy Passion Fruit', 'innovation', 5, POOL_MITACA],
+  ['Juicy Strawberry', 'innovation', 5, POOL_MITACA],
+  ['Tropical Splash', 'innovation', 5, POOL_MITACA],
+  ['Kiwilu', 'innovation', 5, POOL_MITACA],
+  ['Vergel Flowers', 'innovation', 6, POOL_MITACA],
+  ['Galactic Crumble', 'innovation', 5, POOL_MITACA],
+  ['Candy Blast', 'innovation', 5, POOL_MITACA],
+  ['Sumer Waves', 'innovation', 5, POOL_MITACA],
+  ['Pinneapple Ride', 'innovation', 5, POOL_MITACA],
 ];
 
 /** Products flattened from the release list; id = `${startCorte}::${name}`. */
