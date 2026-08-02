@@ -76,6 +76,7 @@ function paintIcons() {
 // ---------------------------------------------------------------------------
 function setStatus(kind, detail) {
   const el = document.getElementById('status');
+  if (!el) return;
   const text = {
     saving: 'Guardando…',
     saved: 'Guardado',
@@ -83,7 +84,8 @@ function setStatus(kind, detail) {
   }[kind] || '';
   el.textContent = text;
   el.className = `fp-status fp-status--${kind}`;
-  if (kind === 'saved') setTimeout(() => { el.textContent = ''; }, 1800);
+  // Keep "Guardado" visible (no auto-clear) so there's always a save-state cue;
+  // it's replaced by "Guardando…" on the next edit. Errors also persist.
 }
 
 // --- Shipment mutations (by producing country -> warehouse -> month) --------
