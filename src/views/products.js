@@ -115,7 +115,11 @@ function header(campaign, globalPct, onGlobalPct, onManage) {
 
 function poolEntry(pl, catalog, alloc) {
   const a = alloc?.pools?.[pl.id] || {};
-  return { cap: poolCapacity(catalog, alloc, pl.id), pct: a.pct ?? null, ov: a.ov || {} };
+  const memberCap = poolCapacity(catalog, alloc, pl.id);
+  // Fall back to the pool's meta as planned capacity when no per-member caps are
+  // set yet (the sheet only gives the pool's combined kg). Real member caps win.
+  const cap = memberCap > 0 ? memberCap : (Number(pl.meta) || 0);
+  return { cap, memberCap, pct: a.pct ?? null, ov: a.ov || {} };
 }
 
 function rollup(mine, camPools, marketMetas, alloc, globalPct, catalog) {
@@ -148,8 +152,9 @@ function rollup(mine, camPools, marketMetas, alloc, globalPct, catalog) {
   const fill = document.createElement('div');
   fill.className = 'prod-fill';
   const fillPct = totalMeta ? Math.round((totalCap / totalMeta) * 100) : 0;
+  const capLabel = camPools.length ? 'Capacidad total (incl. pools)' : 'Capacidad total';
   fill.innerHTML =
-    `Capacidad total <strong>${fmtKg(totalCap)}</strong> (${kgToContainers(totalCap).toFixed(1)} cont) · ` +
+    `${capLabel} <strong>${fmtKg(totalCap)}</strong> (${kgToContainers(totalCap).toFixed(1)} cont) · ` +
     `Meta total <strong>${fmtKg(totalMeta)}</strong> · ` +
     `<strong class="tally tally--${fillPct >= 100 ? 'exact' : 'under'}">fill ${fillPct}%</strong>`;
   wrap.appendChild(fill);
@@ -183,9 +188,10 @@ function rollup(mine, camPools, marketMetas, alloc, globalPct, catalog) {
 function poolCard(pl, catalog, alloc, marketMetas, globalPct, onPoolPct, onPoolOverride) {
   const entry = poolEntry(pl, catalog, alloc);
   const cap = entry.cap;
+  const memberCap = entry.memberCap;
   const meta = Number(pl.meta) || 0;
   const members = (catalog.products || []).filter((p) => p.pool === pl.id).length;
-  const fill = meta ? Math.round((cap / meta) * 100) : 0;
+  const fill = meta ? Math.round((memberCap / meta) * 100) : 0;
 
   const card = document.createElement('article');
   card.className = 'card prod-card';
@@ -194,9 +200,12 @@ function poolCard(pl, catalog, alloc, marketMetas, globalPct, onPoolPct, onPoolO
 
   const h = document.createElement('header');
   h.className = 'card-head';
+  const capLabel = memberCap > 0
+    ? `${fmtKg(memberCap)} cap${meta ? ` · meta ${fmtKg(meta)} · ${fill}%` : ''}`
+    : `${fmtKg(cap)} plan (= meta)`;
   h.innerHTML =
     `<span class="card-cut">${pl.name}</span>` +
-    `<span class="card-sample">${fmtKg(cap)} cap${meta ? ` · meta ${fmtKg(meta)} · ${fill}%` : ''} · ${members} productos</span>`;
+    `<span class="card-sample">${capLabel} · ${members} productos</span>`;
   card.appendChild(h);
 
   const body = document.createElement('div');
