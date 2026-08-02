@@ -12,7 +12,7 @@ import { MONTHS, monthName, campaignOfMonth, CAMPAIGNS } from '../model.js';
 export function renderCatalogModal({
   catalog, tab, onTab, onClose,
   onToggleCorte, onCatAdd, onCatUpdate, onCatRemove,
-  onProdAdd, onProdUpdate, onProdRemove,
+  onProdAdd, onProdUpdate, onProdRemove, onResetCatalog,
   selected, bulkCategory, bulkPool,
   onToggleSelect, onSelectAll, onBulkCategory, onBulkApply, onBulkPool, onBulkApplyPool,
   onPoolAdd, onPoolUpdate, onPoolRemove,
@@ -58,7 +58,7 @@ export function renderCatalogModal({
   else if (tab === 'categorias') body.appendChild(categoriesSection(catalog, onCatAdd, onCatUpdate, onCatRemove));
   else if (tab === 'pools') body.appendChild(poolsSection(catalog, onPoolAdd, onPoolUpdate, onPoolRemove));
   else body.appendChild(productsSection(catalog, {
-    onProdAdd, onProdUpdate, onProdRemove,
+    onProdAdd, onProdUpdate, onProdRemove, onResetCatalog,
     selected: selected || new Set(), bulkCategory: bulkCategory || '', bulkPool: bulkPool || '',
     onToggleSelect, onSelectAll, onBulkCategory, onBulkApply, onBulkPool, onBulkApplyPool,
   }));
@@ -235,7 +235,7 @@ function corteOptions(catalog, currentStart) {
 
 function productsSection(catalog, cb) {
   const {
-    onProdAdd, onProdUpdate, onProdRemove,
+    onProdAdd, onProdUpdate, onProdRemove, onResetCatalog,
     selected, bulkCategory, bulkPool, onToggleSelect, onSelectAll,
     onBulkCategory, onBulkApply, onBulkPool, onBulkApplyPool,
   } = cb;
@@ -385,11 +385,30 @@ function productsSection(catalog, cb) {
     wrap.appendChild(row);
   });
 
+  const actions = document.createElement('div');
+  actions.className = 'prod-actions';
+
   const add = document.createElement('button');
   add.type = 'button';
   add.className = 'wh-add';
   add.innerHTML = '<i data-lucide="plus"></i> Agregar producto';
   add.addEventListener('click', () => onProdAdd());
-  wrap.appendChild(add);
+  actions.appendChild(add);
+
+  if (onResetCatalog) {
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.className = 'fc-btn fc-btn-ghost prod-reset';
+    reset.innerHTML = '<i data-lucide="rotate-ccw"></i> Cargar catálogo base';
+    reset.title = 'Reemplaza categorías, cortes, pools y productos con la lista base';
+    reset.addEventListener('click', () => {
+      if (window.confirm('¿Reemplazar todo el catálogo (categorías, cortes, pools y productos) con la lista base? Esto borra los productos actuales.')) {
+        onResetCatalog();
+      }
+    });
+    actions.appendChild(reset);
+  }
+
+  wrap.appendChild(actions);
   return wrap;
 }

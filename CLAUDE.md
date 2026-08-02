@@ -116,8 +116,12 @@ The product catalogue is **editable** in the **Gestionar productos** modal
 (`catalogModal.js`, opened from the Campaña tabs), persisted as one row, scope
 `catalog`, slug `plan`: `{ categories: [{key,name,macro}], cortes: {1:[months],
 2:[months]}, pools: [{id,name,campaign,meta}], products: [{id, name, category,
-pool, startCorte}] }`. Seeds in `data/catalog.js` (products flattened from
-`products.js`). A product has **one** category and optionally **one pool**; the
+pool, startCorte}] }`. Seeds in `data/catalog.js` — the authoritative 2027
+release list (products, categories, cortes, and the two Innovation pools) hard-
+coded there; `emptyCatalog()` is the single source, and the **Cargar catálogo
+base** button in the Productos tab (`resetCatalogToSeed`) replaces the whole
+catalogue with it (needed because the persisted `catalog` row otherwise wins over
+the seed). A product has **one** category and optionally **one pool**; the
 modal supports **bulk** assignment of both (check several products, pick a
 category or pool, apply). `normalizeCatalog` migrates legacy shapes on load.
 
@@ -163,7 +167,7 @@ src/
     regions.js       harvest declarations + country (for the MIRC goal rollup)
     markets.js       targets and transit delays
     warehouses.js    destination warehouses + lead times (seed defaults)
-    products.js      raw release catalogue (seed source for catalog.js)
+    products.js      legacy raw release list (no longer imported; catalog.js is authoritative)
     catalog.js       editable catalogue seeds: categories, cortes, products
   views/
     consolidado.js   flow + salidas by country + llegadas by market

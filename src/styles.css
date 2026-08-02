@@ -771,6 +771,13 @@
 .wh-add:hover { background: var(--fc-cream); border-color: var(--fc-navy); }
 .wh-add svg { width: 15px; height: 15px; stroke-width: 2; }
 
+.prod-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+}
+.prod-actions .wh-add { margin-top: 12px; }
+.prod-reset { margin-top: 12px; }
+.prod-reset svg { width: 15px; height: 15px; stroke-width: 2; }
+
 @media (max-width: 767px) {
   .wh-row { grid-template-columns: 36px 1fr 96px 38px; gap: 6px; }
 }

@@ -349,6 +349,12 @@ function prodRemove(id) {
   saveCatalogState(c, false);
 }
 
+/** Replace the whole catalogue (categories, cortes, pools, products) with the seed. */
+function resetCatalogToSeed() {
+  state.prodSel = new Set();
+  saveCatalogState(normalizeCatalog(emptyCatalog()), true);
+}
+
 function renderModal() {
   const root = document.getElementById('modal-root');
   if (!root) return;
@@ -369,6 +375,7 @@ function renderModal() {
     onProdAdd: prodAdd,
     onProdUpdate: prodUpdate,
     onProdRemove: prodRemove,
+    onResetCatalog: resetCatalogToSeed,
     selected: state.prodSel,
     bulkCategory: state.bulkCategory,
     bulkPool: state.bulkPool,
