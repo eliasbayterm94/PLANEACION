@@ -179,12 +179,23 @@ function setOverride(key, market, kg) {
 }
 
 // --- Catalog mutations (categories, cortes per campaign, products) ----------
+/** Ensure every product has a `categories` array (migrate legacy `category`). */
+function normalizeCatalog(cat) {
+  return {
+    ...cat,
+    products: (cat.products || []).map((p) => ({
+      ...p,
+      categories: Array.isArray(p.categories) ? p.categories : (p.category ? [p.category] : []),
+    })),
+  };
+}
+
 function catalogCopy() {
   const c = state.catalog;
   return {
     categories: (c.categories || []).map((x) => ({ ...x })),
     cortes: { 1: [...(c.cortes?.[1] || [])], 2: [...(c.cortes?.[2] || [])] },
-    products: (c.products || []).map((x) => ({ ...x })),
+    products: (c.products || []).map((x) => ({ ...x, categories: [...(x.categories || [])] })),
   };
 }
 
@@ -220,14 +231,14 @@ function catUpdate(key, field, val) {
 function catRemove(key) {
   const c = catalogCopy();
   c.categories = c.categories.filter((x) => x.key !== key);
-  c.products.forEach((p) => { if (p.category === key) p.category = ''; });
+  c.products.forEach((p) => { p.categories = (p.categories || []).filter((k) => k !== key); });
   saveCatalogState(c, false);
 }
 
 function prodAdd() {
   const c = catalogCopy();
   const start = c.cortes[1]?.[0] ?? c.cortes[2]?.[0] ?? 9;
-  c.products.push({ id: `p_${Date.now()}`, name: 'Nuevo producto', category: '', startCorte: start });
+  c.products.push({ id: `p_${Date.now()}`, name: 'Nuevo producto', categories: [], startCorte: start });
   saveCatalogState(c, false);
 }
 
@@ -235,6 +246,18 @@ function prodUpdate(id, field, val) {
   const c = catalogCopy();
   const p = c.products.find((x) => x.id === id);
   if (p) p[field] = val;
+  saveCatalogState(c, false);
+}
+
+function prodToggleCategory(id, catKey) {
+  const c = catalogCopy();
+  const p = c.products.find((x) => x.id === id);
+  if (p) {
+    const set = new Set(p.categories || []);
+    if (set.has(catKey)) set.delete(catKey);
+    else set.add(catKey);
+    p.categories = [...set];
+  }
   saveCatalogState(c, false);
 }
 
@@ -260,6 +283,7 @@ function renderModal() {
     onCatRemove: catRemove,
     onProdAdd: prodAdd,
     onProdUpdate: prodUpdate,
+    onProdToggleCategory: prodToggleCategory,
     onProdRemove: prodRemove,
   }));
 }
@@ -424,7 +448,7 @@ async function init() {
   state.goals = goals?.[GOALS_SLUG] || emptyGoals();
   state.alloc = alloc?.[ALLOC_SLUG] || { pctComprometido: DEFAULT_COMPROMETIDO_PCT, products: {} };
   const storedCatalog = catalog?.[CATALOG_SLUG];
-  state.catalog = storedCatalog && storedCatalog.products ? storedCatalog : emptyCatalog();
+  state.catalog = normalizeCatalog(storedCatalog && storedCatalog.products ? storedCatalog : emptyCatalog());
   setCampaignCortes(state.catalog.cortes);
   if (error) setStatus('error', error);
 
@@ -435,7 +459,7 @@ async function init() {
     else if (scope === 'shipment') state.shipments[slug] = value;
     else if (scope === 'goals') state.goals = value;
     else if (scope === 'alloc') state.alloc = value;
-    else if (scope === 'catalog') { state.catalog = value; setCampaignCortes(value.cortes); }
+    else if (scope === 'catalog') { state.catalog = normalizeCatalog(value); setCampaignCortes(value.cortes); }
     else return; // legacy region/market scopes are no longer rendered
     render();
   });

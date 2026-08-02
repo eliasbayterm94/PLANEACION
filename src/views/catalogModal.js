@@ -12,7 +12,7 @@ import { MONTHS, monthName, campaignOfMonth, CAMPAIGNS } from '../model.js';
 export function renderCatalogModal({
   catalog, tab, onTab, onClose,
   onToggleCorte, onCatAdd, onCatUpdate, onCatRemove,
-  onProdAdd, onProdUpdate, onProdRemove,
+  onProdAdd, onProdUpdate, onProdToggleCategory, onProdRemove,
 }) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -53,7 +53,7 @@ export function renderCatalogModal({
   body.className = 'modal-body';
   if (tab === 'cortes') body.appendChild(cortesSection(catalog, onToggleCorte));
   else if (tab === 'categorias') body.appendChild(categoriesSection(catalog, onCatAdd, onCatUpdate, onCatRemove));
-  else body.appendChild(productsSection(catalog, onProdAdd, onProdUpdate, onProdRemove));
+  else body.appendChild(productsSection(catalog, onProdAdd, onProdUpdate, onProdToggleCategory, onProdRemove));
   panel.appendChild(body);
 
   backdrop.appendChild(panel);
@@ -157,16 +157,16 @@ function corteOptions(catalog, currentStart) {
   return opts;
 }
 
-function productsSection(catalog, onProdAdd, onProdUpdate, onProdRemove) {
+function productsSection(catalog, onProdAdd, onProdUpdate, onProdToggleCategory, onProdRemove) {
   const wrap = document.createElement('div');
   const intro = document.createElement('p');
   intro.className = 'view-sub';
-  intro.innerHTML = 'Cada producto: nombre, categoría y <strong>corte de inicio</strong> (desde qué corte se produce; define su campaña y color).';
+  intro.innerHTML = 'Cada producto: nombre, <strong>categorías</strong> (selección múltiple) y <strong>corte de inicio</strong> (desde qué corte se produce; define su campaña y color).';
   wrap.appendChild(intro);
 
   const heads = document.createElement('div');
   heads.className = 'prod-cat-row prod-cat-row--head';
-  heads.innerHTML = '<span>Producto</span><span>Categoría</span><span>Corte de inicio</span><span></span>';
+  heads.innerHTML = '<span>Producto</span><span>Categorías</span><span>Corte de inicio</span><span></span>';
   wrap.appendChild(heads);
 
   const cats = catalog.categories || [];
@@ -186,18 +186,21 @@ function productsSection(catalog, onProdAdd, onProdUpdate, onProdRemove) {
     name.addEventListener('change', (e) => onProdUpdate(p.id, 'name', e.target.value.trim() || p.name));
     row.appendChild(name);
 
-    const cat = document.createElement('select');
-    cat.className = 'wh-select';
-    const none = document.createElement('option'); none.value = ''; none.textContent = '— sin categoría —';
-    if (!p.category) none.selected = true; cat.appendChild(none);
+    const selected = new Set(p.categories || []);
+    const chips = document.createElement('div');
+    chips.className = 'prod-cat-chips';
     cats.forEach((c) => {
-      const o = document.createElement('option');
-      o.value = c.key; o.textContent = `${c.name} (${c.macro === 'mirc' ? 'MIRC' : 'Community'})`;
-      if (p.category === c.key) o.selected = true;
-      cat.appendChild(o);
+      const on = selected.has(c.key);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'catsel-chip' + (on ? ` on ${c.macro === 'mirc' ? 'is-mirc' : 'is-community'}` : '');
+      chip.textContent = c.name;
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+      chip.title = c.macro === 'mirc' ? 'MIRC' : 'Community';
+      chip.addEventListener('click', () => onProdToggleCategory(p.id, c.key));
+      chips.appendChild(chip);
     });
-    cat.addEventListener('change', (e) => onProdUpdate(p.id, 'category', e.target.value));
-    row.appendChild(cat);
+    row.appendChild(chips);
 
     const corte = document.createElement('select');
     corte.className = 'wh-select';

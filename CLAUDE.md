@@ -111,8 +111,9 @@ context and the country card shows salidas (kg) from its producing regions.
 The product catalogue is **editable** in the **Gestionar productos** modal
 (`catalogModal.js`, opened from the Campaña tabs), persisted as one row, scope
 `catalog`, slug `plan`: `{ categories: [{key,name,macro}], cortes: {1:[months],
-2:[months]}, products: [{id, name, category, startCorte}] }`. Seeds in
-`data/catalog.js` (products flattened from `products.js`).
+2:[months]}, products: [{id, name, categories:[key], startCorte}] }`. Seeds in
+`data/catalog.js` (products flattened from `products.js`). A product can carry
+**multiple** categories (legacy single `category` is migrated on load).
 
 - **Categorías:** Community + MIRC subcategories (Microlot, Innovation, Reserve,
   Competition), each with a macro; editable.
@@ -120,8 +121,9 @@ The product catalogue is **editable** in the **Gestionar productos** modal
   `setCampaignCortes(catalog.cortes)` in `model.js` overrides `CAMPAIGNS[n].cutoffMonths`
   at runtime, so `campaignOfMonth` / bands / grouping across the app reflect the
   edit — CAMPAIGNS stays the single source everything reads.
-- **Productos:** each product has a category and a **startCorte** (the cutoff it
-  is produced from; its campaign + colour derive from that month).
+- **Productos:** each product has zero or more **categories** (multi-select via
+  toggle chips) and a **startCorte** (the cutoff it is produced from; its campaign
+  + colour derive from that month).
 
 ### Product allocation (Campaña tabs)
 

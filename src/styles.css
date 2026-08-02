@@ -906,6 +906,24 @@
 .prod-cat-row--c1 { border-left-color: var(--fc-yellow); }
 .prod-cat-row--c2 { border-left-color: var(--fc-blue); }
 
+.prod-cat-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.catsel-chip {
+  font-family: var(--fc-font-body);
+  font-size: 10.5px;
+  font-weight: var(--fc-fw-medium);
+  padding: 4px 9px;
+  border-radius: var(--fc-radius-pill);
+  border: 1px solid var(--fc-ink-100);
+  background: #fff;
+  color: var(--fc-ink-500);
+  cursor: pointer;
+  transition: color var(--fc-dur-fast), background var(--fc-dur-fast), border-color var(--fc-dur-fast);
+}
+.catsel-chip:hover { color: var(--fc-navy); border-color: var(--fc-ink-200); }
+.catsel-chip.on { font-weight: var(--fc-fw-semibold); border-color: transparent; color: var(--fc-navy); }
+.catsel-chip.on.is-mirc { background: var(--fc-yellow); }
+.catsel-chip.on.is-community { background: var(--fc-blue-100); color: var(--fc-blue-900); }
+
 @media (max-width: 767px) {
   .prod-cat-row { grid-template-columns: 1fr 1fr; }
   .cat-row { grid-template-columns: 1fr 100px 30px; }
