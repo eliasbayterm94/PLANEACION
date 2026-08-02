@@ -246,7 +246,7 @@ function productsSection(catalog, cb) {
     row.appendChild(name);
 
     const cat = document.createElement('select');
-    cat.className = 'wh-select';
+    cat.className = 'wh-select cat-select';
     const none = document.createElement('option'); none.value = ''; none.textContent = '— sin categoría —';
     if (!p.category) none.selected = true; cat.appendChild(none);
     cats.forEach((c) => {
@@ -259,7 +259,7 @@ function productsSection(catalog, cb) {
     row.appendChild(cat);
 
     const corte = document.createElement('select');
-    corte.className = 'wh-select';
+    corte.className = 'wh-select corte-select';
     corteOptions(catalog, p.startCorte).forEach((o) => {
       const opt = document.createElement('option');
       opt.value = o.value; opt.textContent = o.label;

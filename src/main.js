@@ -287,6 +287,9 @@ function prodRemove(id) {
 function renderModal() {
   const root = document.getElementById('modal-root');
   if (!root) return;
+  // Preserve the modal body scroll across re-renders (checkbox/edits re-render).
+  const prevBody = root.querySelector('.modal-body');
+  const scrollTop = prevBody ? prevBody.scrollTop : 0;
   root.innerHTML = '';
   if (!state.modalOpen) return;
   root.appendChild(renderCatalogModal({
@@ -308,6 +311,8 @@ function renderModal() {
     onBulkCategory: setBulkCategory,
     onBulkApply: bulkApplyCategory,
   }));
+  const newBody = root.querySelector('.modal-body');
+  if (newBody) newBody.scrollTop = scrollTop;
 }
 
 // ---------------------------------------------------------------------------

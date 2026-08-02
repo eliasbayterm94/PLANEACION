@@ -846,6 +846,7 @@
   border-bottom: 1px solid var(--fc-ink-100);
   background: #fff;
   border-radius: var(--fc-radius-4) var(--fc-radius-4) 0 0;
+  flex-shrink: 0;
 }
 .modal-title {
   font-family: var(--fc-font-display);
@@ -863,7 +864,7 @@
 }
 .modal-close:hover { color: var(--fc-navy); background: var(--fc-cream); }
 .modal-close svg { width: 16px; height: 16px; }
-.modal-tabs { display: flex; gap: 4px; padding: 0 20px; background: #fff; border-bottom: 1px solid var(--fc-ink-100); }
+.modal-tabs { display: flex; gap: 4px; padding: 0 20px; background: #fff; border-bottom: 1px solid var(--fc-ink-100); flex-shrink: 0; }
 .modal-tab {
   background: transparent; border: none; cursor: pointer;
   padding: 12px 12px; font-family: var(--fc-font-body); font-size: var(--fc-fs-12);
@@ -872,7 +873,7 @@
 }
 .modal-tab:hover { color: var(--fc-navy); }
 .modal-tab.active { color: var(--fc-navy); border-bottom-color: var(--fc-yellow); }
-.modal-body { padding: 20px; overflow-y: auto; }
+.modal-body { padding: 20px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 
 .cortes-block { margin-bottom: var(--fc-space-5); }
 .cortes-camp {
@@ -938,8 +939,30 @@
 .catsel-chip.on.is-community { background: var(--fc-blue-100); color: var(--fc-blue-900); }
 
 @media (max-width: 767px) {
-  .prod-cat-row { grid-template-columns: 20px 1fr 1fr; }
+  /* Modal fills more of the screen and scrolls comfortably */
+  .modal-backdrop { padding: 12px 8px; }
+  .modal-panel { max-height: 94vh; }
+  .modal-head { padding: 12px 14px; }
+  .modal-tabs { padding: 0 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .modal-tab { white-space: nowrap; padding: 12px 8px; }
+  .modal-body { padding: 14px; }
+
+  /* Product rows stack: [check][name][x] / [category] / [corte] */
+  .prod-cat-row {
+    grid-template-columns: 22px 1fr 34px;
+    row-gap: 6px;
+    padding: 10px 0 10px 8px;
+    border-bottom: 1px solid var(--fc-ink-100);
+  }
+  .prod-cat-row--head { display: none; }
+  .prod-cat-row .prod-check { grid-column: 1; grid-row: 1; }
+  .prod-cat-row .metas-input { grid-column: 2; grid-row: 1; }
+  .prod-cat-row .wh-remove { grid-column: 3; grid-row: 1; }
+  .prod-cat-row .cat-select { grid-column: 1 / -1; grid-row: 2; }
+  .prod-cat-row .corte-select { grid-column: 1 / -1; grid-row: 3; }
+
   .cat-row { grid-template-columns: 1fr 100px 30px; }
+  .bulk-bar .wh-select { flex: 1; min-width: 140px; }
 }
 
 .prod-global {
