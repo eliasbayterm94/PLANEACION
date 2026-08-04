@@ -1,6 +1,7 @@
 import { regions } from './data/regions.js';
 import { markets } from './data/markets.js';
 import { defaultWarehouses, emptyWarehouseConfig } from './data/warehouses.js';
+import { defaultMarketGoals, defaultWarehouseGoals } from './data/goals.js';
 import { emptyCatalog, defaultCapacities } from './data/catalog.js';
 import {
   buildSchedules, CAMPAIGNS, YEAR, warehouseLeadLookup, emptyGoals,
@@ -139,6 +140,18 @@ function setWarehouseGoal(whName, category, kg) {
 function setCountryMirc(country, kg) {
   const g = goalsCopy();
   g.countriesMIRC[country] = kg;
+  saveGoalsState(g);
+}
+
+/** Merge the seed market/warehouse goals into current goals (keeps other axes). */
+function loadMarketGoalsSeed() {
+  const g = goalsCopy();
+  Object.entries(defaultMarketGoals).forEach(([slug, v]) => {
+    g.markets[slug] = { ...(g.markets[slug] || {}), ...v };
+  });
+  Object.entries(defaultWarehouseGoals).forEach(([wh, v]) => {
+    g.warehouses[wh] = { ...(g.warehouses[wh] || {}), ...v };
+  });
   saveGoalsState(g);
 }
 
@@ -492,6 +505,7 @@ function renderView() {
       onWarehouseGoal: (wh, category, kg) => setWarehouseGoal(wh, category, kg),
       onCountryMirc: (country, kg) => setCountryMirc(country, kg),
       onCompanyGoal: (category, kg) => setCompanyGoal(category, kg),
+      onLoadGoals: loadMarketGoalsSeed,
     }));
   } else if (kind === 'programacion') {
     root.appendChild(renderProgramacion({

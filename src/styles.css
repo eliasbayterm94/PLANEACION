@@ -705,6 +705,8 @@
   gap: 12px;
   margin-bottom: 12px;
 }
+.metas-load { align-self: center; flex: none; white-space: nowrap; }
+.metas-load svg { width: 15px; height: 15px; stroke-width: 2; }
 .wh-card-title {
   font-family: var(--fc-font-display);
   font-size: var(--fc-fs-16);

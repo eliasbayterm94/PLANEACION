@@ -18,12 +18,12 @@ import {
  */
 export function renderMetas({
   schedules, markets, warehouses, goals, shipments, leadLookup, catalog, alloc,
-  onMarketGoal, onWarehouseGoal, onCountryMirc, onCompanyGoal,
+  onMarketGoal, onWarehouseGoal, onCountryMirc, onCompanyGoal, onLoadGoals,
 }) {
   const el = document.createElement('div');
   el.appendChild(header());
   el.appendChild(companyCard(markets, warehouses, goals, catalog, alloc, onCompanyGoal));
-  el.appendChild(marketCard(markets, warehouses, goals, shipments, leadLookup, onMarketGoal, onWarehouseGoal));
+  el.appendChild(marketCard(markets, warehouses, goals, shipments, leadLookup, onMarketGoal, onWarehouseGoal, onLoadGoals));
   el.appendChild(countryCard(schedules, goals, shipments, leadLookup, onCountryMirc));
   return el;
 }
@@ -178,13 +178,26 @@ function goalRow({ label, indent, community, mirc, total, context, onCommunity, 
 }
 
 /** Section 1: Community + MIRC goals per sales region (market or warehouse). */
-function marketCard(markets, warehouses, goals, shipments, leadLookup, onMarketGoal, onWarehouseGoal) {
+function marketCard(markets, warehouses, goals, shipments, leadLookup, onMarketGoal, onWarehouseGoal, onLoadGoals) {
   const card = document.createElement('section');
   card.className = 'wh-card';
 
   const title = document.createElement('div');
   title.className = 'wh-card-head';
   title.innerHTML = '<span class="wh-card-title">Metas por región de venta</span>';
+  if (onLoadGoals) {
+    const load = document.createElement('button');
+    load.type = 'button';
+    load.className = 'fc-btn fc-btn-ghost metas-load';
+    load.innerHTML = '<i data-lucide="download"></i> Cargar metas de mercado';
+    load.title = 'Rellena USA, Europa (Rotterdam), MENA y AU con las metas del plan; no borra lo demás';
+    load.addEventListener('click', () => {
+      if (window.confirm('¿Cargar las metas de mercado del plan (USA, Europa→Rotterdam, MENA, AU)? Sobrescribe esas filas; el resto (compañía, MIRC por país) se mantiene.')) {
+        onLoadGoals();
+      }
+    });
+    title.appendChild(load);
+  }
   card.appendChild(title);
 
   const heads = document.createElement('div');
