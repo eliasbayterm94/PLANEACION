@@ -1328,3 +1328,38 @@
 .flujo-hint { color: var(--fc-ink-300); font-size: 11px; }
 .flujo-hint i { width: 13px; height: 13px; stroke-width: 2; vertical-align: middle; }
 .flujo-view .fseq { font-size: 8px; font-weight: var(--fc-fw-bold); opacity: 0.6; margin-left: 1px; vertical-align: super; }
+
+/* --- Navy canvas: the Flujo tab renders as a dark presentation surface ---
+   Only the tokens are flipped, so every rule inside keeps working unchanged
+   (panels, hairlines, markers). `--fc-navy` inverts to a light value: it is
+   both the heading colour and the filled "llegada" block, and both need to
+   read light-on-dark here. */
+/* The sidebar is 100vh sticky, so `.fc-app`'s cream shows below it on long
+   pages — flip it too, and it blends into the sidebar's navy. */
+body.fp-dark,
+body.fp-dark .fc-app { background: var(--fc-navy-dark); }
+.fc-app-main.is-dark {
+  --fc-paper: #1b203d;
+  --fc-cream: #161b33;
+  --fc-ink-100: #2c3355;
+  --fc-ink-200: #3d456b;
+  --fc-ink-300: #6f78a0;
+  --fc-ink-500: #a2aac9;
+  --fc-ink-700: #eef0f8;
+  --fc-navy: #e7eaf7;
+  --fc-blue-700: #9dc0dc;
+  --fc-yellow-600: #d9d33c;
+  --fc-yellow-700: #cfc832;
+  --fc-success: #8fce63;
+  --fc-danger: #ef9a8e;
+  background: var(--fc-navy-dark);
+  color: var(--fc-ink-700);
+}
+.fc-app-main.is-dark .fc-topbar {
+  background: #161b33;
+  border-bottom-color: var(--fc-ink-100);
+}
+.fc-app-main.is-dark .fc-topbar-page-title { color: var(--fc-navy); }
+.fc-app-main.is-dark .fc-mobile-toggle { color: var(--fc-ink-500); }
+.fc-app-main.is-dark .fp-footer { border-top-color: var(--fc-ink-100); color: var(--fc-ink-500); }
+.fc-app-main.is-dark .fc-caption { color: var(--fc-ink-500); }

@@ -547,6 +547,12 @@ function renderView() {
   root.innerHTML = '';
   const [kind, arg] = state.view.split(':');
 
+  // Flujo is a presentation canvas: the whole pane flips to the navy theme.
+  // The body follows so the strip below the sidebar doesn't stay cream.
+  const dark = kind === 'flujo';
+  document.querySelector('.fc-app-main')?.classList.toggle('is-dark', dark);
+  document.body.classList.toggle('fp-dark', dark);
+
   const leadLookup = warehouseLeadLookup(state.warehouses);
 
   if (kind === 'consolidado') {
