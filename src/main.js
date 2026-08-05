@@ -3,13 +3,14 @@ import { markets } from './data/markets.js';
 import { defaultWarehouses, emptyWarehouseConfig } from './data/warehouses.js';
 import { defaultMarketGoals, defaultWarehouseGoals } from './data/goals.js';
 import { emptyCatalog, defaultCapacities } from './data/catalog.js';
+import { defaultCampaignWindows, normalizeWindows } from './data/campaignWindows.js';
 import {
   buildSchedules, CAMPAIGNS, YEAR, warehouseLeadLookup, emptyGoals,
   DEFAULT_COMPROMETIDO_PCT, setCampaignCortes,
 } from './model.js';
 import {
-  loadPlan, saveWarehouse, saveShipment, saveGoals, saveAlloc, saveCatalog,
-  GOALS_SLUG, ALLOC_SLUG, CATALOG_SLUG,
+  loadPlan, saveWarehouse, saveShipment, saveGoals, saveAlloc, saveCatalog, saveWindows,
+  GOALS_SLUG, ALLOC_SLUG, CATALOG_SLUG, WINDOWS_SLUG,
   subscribeToPlan, isRemote, editor, setEditor,
 } from './store.js';
 import { renderCatalogModal } from './views/catalogModal.js';
@@ -20,6 +21,8 @@ import { renderCosechas } from './views/cosechas.js';
 import { renderProgramacion } from './views/programacion.js';
 import { renderBodegas } from './views/bodegas.js';
 import { renderMetas } from './views/metas.js';
+import { renderFlujo } from './views/flujo.js';
+import { renderCampaignWindows } from './views/campaignWindows.js';
 
 const schedules = buildSchedules(regions);
 
@@ -31,6 +34,8 @@ const state = {
   goals: emptyGoals(), // { markets, warehouses, countriesMIRC }
   alloc: {}, // { pctComprometido, products: { productId: { cap, pct, ov } } }
   catalog: emptyCatalog(), // { categories, cortes, products }
+  windows: defaultCampaignWindows(), // commercial campaign windows (Flujo layer)
+  flujoFilter: { market: '', wh: '', origin: '' }, // Flujo view filters
   modalOpen: false,
   modalTab: 'cortes',
   prodSel: new Set(), // product ids selected for bulk assignment
@@ -60,7 +65,9 @@ const GROUP_ICON = {
 const TABS = [
   { id: 'consolidado', label: 'Consolidado', group: 'Plan', icon: 'layout-dashboard' },
   { id: 'programacion', label: 'Programación de salidas', group: 'Plan', icon: 'ship' },
+  { id: 'flujo', label: 'Flujo', group: 'Plan', icon: 'git-commit-horizontal' },
   { id: 'metas', label: 'Metas', group: 'Plan', icon: 'target' },
+  { id: 'ventanas', label: 'Ventanas de campaña', group: 'Plan', icon: 'calendar-range' },
   { id: 'cosechas', label: 'Cosechas', group: 'Origen', icon: 'eye' },
   ...markets.map((m) => ({ id: `market:${m.slug}`, label: m.name, group: 'Destino' })),
   { id: 'bodegas', label: 'Bodegas', group: 'Destino', icon: 'warehouse' },
@@ -153,6 +160,51 @@ function loadMarketGoalsSeed() {
     g.warehouses[wh] = { ...(g.warehouses[wh] || {}), ...v };
   });
   saveGoalsState(g);
+}
+
+// --- Commercial campaign windows (Flujo layer) ------------------------------
+function saveWindowsState(value) {
+  state.windows = value;
+  saveWindows(value, setStatus);
+  render();
+}
+
+function windowsCopy() {
+  const w = state.windows;
+  return {
+    campaigns: {
+      1: { ...w.campaigns[1], corte: [...w.campaigns[1].corte], disp: [...w.campaigns[1].disp] },
+      2: { ...w.campaigns[2], corte: [...w.campaigns[2].corte], disp: [...w.campaigns[2].disp] },
+    },
+    despachoOffset: w.despachoOffset,
+    outExtra: w.outExtra,
+  };
+}
+
+/** Toggle a month in a campaign's corte or disp list. */
+function toggleWindowMonth(camp, field, month) {
+  const w = windowsCopy();
+  const arr = w.campaigns[camp][field];
+  const i = arr.indexOf(month);
+  if (i >= 0) arr.splice(i, 1);
+  else arr.push(month);
+  arr.sort((a, b) => a - b);
+  saveWindowsState(w);
+}
+
+function setWindowsOffset(field, val) {
+  const w = windowsCopy();
+  w[field] = Math.max(0, Number(val) || 0);
+  saveWindowsState(w);
+}
+
+function resetWindowsToSeed() {
+  saveWindowsState(defaultCampaignWindows());
+}
+
+function setFlujoFilter(key, value) {
+  state.flujoFilter = { ...state.flujoFilter, [key]: value };
+  render();
 }
 
 // --- Product allocation mutations (capacity-driven, fair-share by meta) ------
@@ -518,6 +570,23 @@ function renderView() {
       onCountry: (c) => { state.planCountry = c; render(); },
       onShip: (country, wh, month, containers) => setShip(country, wh, month, containers),
     }));
+  } else if (kind === 'flujo') {
+    root.appendChild(renderFlujo({
+      schedules, markets,
+      warehouses: state.warehouses,
+      shipments: state.shipments,
+      windows: state.windows,
+      leadLookup,
+      filter: state.flujoFilter,
+      onFilter: (key, value) => setFlujoFilter(key, value),
+    }));
+  } else if (kind === 'ventanas') {
+    root.appendChild(renderCampaignWindows({
+      windows: state.windows,
+      onToggleMonth: (camp, field, month) => toggleWindowMonth(camp, field, month),
+      onOffset: (field, val) => setWindowsOffset(field, val),
+      onReset: resetWindowsToSeed,
+    }));
   } else if (kind === 'cosechas') {
     root.appendChild(renderCosechas({ schedules }));
   } else if (kind === 'market') {
@@ -597,7 +666,7 @@ async function init() {
   const fromHash = location.hash.slice(1);
   if (fromHash && TABS.some((t) => t.id === fromHash)) state.view = fromHash;
 
-  const { warehouse, shipment, goals, alloc, catalog, error } = await loadPlan();
+  const { warehouse, shipment, goals, alloc, catalog, windows, error } = await loadPlan();
   state.warehouses = buildWarehouses(warehouse);
   state.shipments = shipment || {};
   state.goals = goals?.[GOALS_SLUG] || emptyGoals();
@@ -605,6 +674,7 @@ async function init() {
   const storedCatalog = catalog?.[CATALOG_SLUG];
   state.catalog = normalizeCatalog(storedCatalog && storedCatalog.products ? storedCatalog : emptyCatalog());
   setCampaignCortes(state.catalog.cortes);
+  state.windows = normalizeWindows(windows?.[WINDOWS_SLUG]);
   if (error) setStatus('error', error);
 
   render();
@@ -615,6 +685,7 @@ async function init() {
     else if (scope === 'goals') state.goals = value;
     else if (scope === 'alloc') state.alloc = value;
     else if (scope === 'catalog') { state.catalog = normalizeCatalog(value); setCampaignCortes(value.cortes); }
+    else if (scope === 'windows') state.windows = normalizeWindows(value);
     else return; // legacy region/market scopes are no longer rendered
     render();
   });

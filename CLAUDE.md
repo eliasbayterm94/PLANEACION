@@ -170,10 +170,13 @@ src/
     warehouses.js    destination warehouses + lead times (seed defaults)
     products.js      legacy raw release list (no longer imported; catalog.js is authoritative)
     catalog.js       editable catalogue seeds: categories, cortes, products
+    campaignWindows.js  commercial campaign windows seed (Flujo layer)
   views/
     consolidado.js   flow + salidas by country + llegadas by market
     programacion.js  salidas cockpit: country tab, market→warehouse, valle/meta
+    flujo.js         read-only roadmap: campaign windows + destino chain ("Flujo" tab)
     metas.js         kg goals by category + country MIRC target ("Metas" tab)
+    campaignWindows.js  edit commercial campaign windows ("Ventanas de campaña" tab)
     cosechas.js      read-only Gantt of every origin at once ("Cosechas" tab)
     market.js        per-market arrivals (derived, read-only)
     bodegas.js       edit warehouses + lead times per destination ("Bodegas" tab)
@@ -228,6 +231,30 @@ with no backend.
 Netlify, same as `forest-coffee-ctrm` and `forest-contract-bot`. Set
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Netlify env. RLS is
 currently open — tighten before the link goes past the internal team.
+
+---
+
+## The Flujo roadmap + commercial campaign windows
+
+The **Flujo** tab (`views/flujo.js`) is a **read-only** roadmap for ops & sales,
+fed by the salidas inputs. A **17-month axis** (Ago–Dic of the operative year +
+Ene–Dic of the sales year, `FLUJO_AXIS`/`flujoPos` in `model.js`) shows two
+lenses: the **campaign windows** (cosechas reference + muestra→corte→producción→
+trilla→despacho→disponible per campaign) and the **destino por bodega**
+(corte de confirmación → despacho → llegada, derived per warehouse). Despachos
+are coloured by campaign; filters are región destino / bodega / región origen.
+
+**Commercial campaign windows are a SEPARATE layer** from the product `CAMPAIGNS`
+(mitaca/principal). Here a "campaña" = when coffee is **available to sell at
+destination**; cortes/despachos are operational. Seeds in
+`data/campaignWindows.js`, editable in the **Ventanas de campaña** tab
+(`views/campaignWindows.js`), persisted as one row (scope `windows`, slug
+`plan`): `{ campaigns: { 1|2: {name,color,corte:[months],disp:[months]} },
+despachoOffset, outExtra }`. The chain: **despacho = corte + despachoOffset**
+(default 2 = producción + trilla); **+outExtra** if the coffee is fuera de
+campaña; producción = corte→corte+1, trilla = corte+1→corte+2, muestra = corte−1;
+llegada = despacho + warehouse lead = disponible. This layer never changes the
+products — `model.js` helpers: `despachoMonths`, `campaignOfDespacho`, `flujoPos`.
 
 ---
 

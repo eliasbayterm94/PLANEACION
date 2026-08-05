@@ -130,6 +130,48 @@ export function productCampaign(p) {
   return campaignOfMonth(p?.startCorte);
 }
 
+// ---------------------------------------------------------------------------
+// Commercial campaign windows (the "Flujo" roadmap layer)
+//
+// SEPARATE from the product CAMPAIGNS above. Here a "campaña" = when coffee is
+// available to sell at destination. Cortes/despachos are operational windows
+// that feed it. The full chain per container:
+//   corte (confirma · inicia producción)
+//     → producción (corte → corte+1)
+//     → trilla/empaque (corte+1 → corte+2)
+//     → despacho (corte + despachoOffset, default 2; +outExtra if fuera de campaña)
+//     → llegada (despacho + lead de bodega) = disponible para vender.
+// ---------------------------------------------------------------------------
+
+/** Despacho months for a commercial campaign = its cortes shifted by despachoOffset. */
+export function despachoMonths(win, camp) {
+  const off = win?.despachoOffset ?? 2;
+  return (win?.campaigns?.[camp]?.corte || []).map((m) => mod12(m + off));
+}
+
+/** Which commercial campaign a despacho month belongs to (C1 wins on overlap). */
+export function campaignOfDespacho(win, month) {
+  const m = mod12(month);
+  if (despachoMonths(win, 1).includes(m)) return 1;
+  if (despachoMonths(win, 2).includes(m)) return 2;
+  return null;
+}
+
+/**
+ * 17-month roadmap axis: Ago–Dic of the prior/operative year, then Ene–Dic of
+ * the sales year. Position of a month depends on its campaign so each campaign
+ * reads left-to-right: Campaña 1's Ago–Dic sit in the prior-year block.
+ */
+export const FLUJO_AXIS = [7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  .map((m, i) => ({ month: m, block: i < 5 ? 'op' : 'venta' }));
+export const FLUJO_YSEP = 5; // Ene (año de venta) column index
+
+export function flujoPos(month, campaign) {
+  const m = mod12(month);
+  if (campaign === 1 && m >= 7) return m - 7; // prior-year block Ago–Dic
+  return 5 + m; // sales year Ene–Dic
+}
+
 /** A region's dominant campaign — for grouping and colour only, never for logic. */
 export function primaryCampaign(schedule) {
   const counts = {};

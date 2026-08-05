@@ -21,12 +21,13 @@ const SAVE_DEBOUNCE_MS = 600;
 
 // These scopes store a config/allocation OBJECT, not a numeric month map, so
 // they skip the numeric normalise step on load and realtime.
-const RAW_SCOPES = new Set(['warehouse', 'shipment', 'goals', 'alloc', 'catalog']);
+const RAW_SCOPES = new Set(['warehouse', 'shipment', 'goals', 'alloc', 'catalog', 'windows']);
 
 /** Single-row scopes for the whole plan. */
 export const GOALS_SLUG = 'plan';
 export const ALLOC_SLUG = 'plan';
 export const CATALOG_SLUG = 'plan';
+export const WINDOWS_SLUG = 'plan';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -59,7 +60,7 @@ export async function loadPlan() {
     return { ...readLocal(), error: error.message };
   }
 
-  const plan = { region: {}, market: {}, warehouse: {}, shipment: {}, goals: {}, alloc: {}, catalog: {} };
+  const plan = { region: {}, market: {}, warehouse: {}, shipment: {}, goals: {}, alloc: {}, catalog: {}, windows: {} };
   (data || []).forEach((row) => {
     if (!plan[row.scope]) plan[row.scope] = {};
     plan[row.scope][row.slug] =
@@ -155,6 +156,11 @@ export function saveCatalog(value, onStatus = () => {}) {
   savePlanSlug('catalog', CATALOG_SLUG, value, onStatus);
 }
 
+/** Persist the commercial campaign windows (cortes + disponibilidad per campaign). */
+export function saveWindows(value, onStatus = () => {}) {
+  savePlanSlug('windows', WINDOWS_SLUG, value, onStatus);
+}
+
 // ---------------------------------------------------------------------------
 // Realtime — so the team sees each other's edits during a planning session
 // ---------------------------------------------------------------------------
@@ -193,9 +199,10 @@ function readLocal() {
       goals: parsed.goals || {},
       alloc: parsed.alloc || {},
       catalog: parsed.catalog || {},
+      windows: parsed.windows || {},
     };
   } catch {
-    return { region: {}, market: {}, warehouse: {}, shipment: {}, goals: {}, alloc: {}, catalog: {} };
+    return { region: {}, market: {}, warehouse: {}, shipment: {}, goals: {}, alloc: {}, catalog: {}, windows: {} };
   }
 }
 
