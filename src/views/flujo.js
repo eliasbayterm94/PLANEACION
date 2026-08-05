@@ -21,13 +21,21 @@ export function renderFlujo({ schedules, markets, warehouses, shipments, windows
   el.className = 'flujo-view';
   const whList = listWarehouses(warehouses, markets);
   const despWh = despachosByWarehouse(shipments);
-  const totalCont = Object.values(despWh).reduce((s, m) => s + Object.values(m).reduce((a, b) => a + b, 0), 0);
+  const totalCont = Object.values(despWh).reduce((s, byCty) => s
+    + Object.values(byCty).reduce((a, months) => a + Object.values(months).reduce((x, y) => x + y, 0), 0), 0);
+
+  // Shipments are keyed by producing COUNTRY, so picking an origin region
+  // narrows the destino to that region's country (the finest real granularity).
+  const originCountry = filter.origin
+    ? schedules.find((r) => r.slug === filter.origin)?.country || ''
+    : '';
+  const withCountry = { ...filter, country: originCountry };
 
   el.appendChild(header());
   el.appendChild(kpis(totalCont, schedules.length, whList.length));
   el.appendChild(filterBar(markets, whList, schedules, filter, onFilter));
   el.appendChild(windowsSection(schedules, windows, filter));
-  el.appendChild(destinoSection(markets, whList, despWh, windows, filter));
+  el.appendChild(destinoSection(markets, whList, despWh, windows, withCountry));
   el.appendChild(foot(windows));
   return el;
 }
@@ -200,35 +208,60 @@ function rangeLabel(months) {
 }
 
 // --- Destino por bodega -----------------------------------------------------
+/** { warehouse: { country: { monthIdx: containers } } } — origin is kept so the
+ *  destino lanes can separate, e.g., Rwanda's departures from Colombia's. */
 function despachosByWarehouse(shipments) {
   const out = {};
-  Object.values(shipments || {}).forEach((cty) => {
+  Object.entries(shipments || {}).forEach(([country, cty]) => {
     const ship = cty?.ship || {};
     Object.entries(ship).forEach(([wh, months]) => {
       out[wh] = out[wh] || {};
-      Object.entries(months || {}).forEach(([m, n]) => { out[wh][+m] = (out[wh][+m] || 0) + (Number(n) || 0); });
+      out[wh][country] = out[wh][country] || {};
+      Object.entries(months || {}).forEach(([m, n]) => {
+        const v = Number(n) || 0;
+        if (v > 0) out[wh][country][+m] = (out[wh][country][+m] || 0) + v;
+      });
     });
   });
   return out;
 }
 
-/** Container batches for a warehouse, numbered in cycle order (Oct→Sep). */
-function warehouseChains(w, months, windows) {
+/** Countries that actually ship to a warehouse, Colombia first. */
+function originsOf(byCountry) {
+  return Object.entries(byCountry || {})
+    .filter(([, months]) => Object.keys(months).length)
+    .map(([c]) => c)
+    .sort((a, b) => (a === 'Colombia' ? -1 : b === 'Colombia' ? 1 : a.localeCompare(b)));
+}
+
+/**
+ * Container batches for one warehouse and one origin country, numbered in cycle
+ * order (Oct→Sep). The corte is `despachoOffset` months before the despacho for
+ * every origin — Rwanda included — so the chain geometry is uniform.
+ */
+function warehouseChains(w, months, windows, country = 'Colombia') {
   const lead = Math.round(w.lead);
+  const rw = country === 'Rwanda';
+  const tag = rw ? 'R' : '';
   return Object.entries(months)
     .map(([mm, n]) => ({ month: +mm, n, d: despachoPos(+mm) }))
     .sort((a, b) => a.d - b.d)
-    .map((bt, i) => ({
-      id: `${w.name}-${i + 1}`,
-      seq: i + 1,
-      n: bt.n,
-      camp: despCamp(bt.month),
-      c: bt.d - windows.despachoOffset,
-      d: bt.d,
-      l: bt.d + lead,
-      readout: `${w.name}-${i + 1} · Corte ${monthName(mod12(bt.month - windows.despachoOffset))} ${posYear(bt.d - windows.despachoOffset)} → `
-        + `Despacho ${monthName(bt.month)} ${posYear(bt.d)} → Llega ${monthName(mod12(bt.month + lead))} ${posYear(bt.d + lead)} · ${bt.n} cont`,
-    }))
+    .map((bt, i) => {
+      const id = `${w.name}-${tag}${i + 1}`;
+      return {
+        id,
+        seq: `${tag}${i + 1}`,
+        n: bt.n,
+        camp: despCamp(bt.month),
+        country,
+        rw,
+        c: bt.d - windows.despachoOffset,
+        d: bt.d,
+        l: bt.d + lead,
+        readout: `${id} · ${country} · Corte ${monthName(mod12(bt.month - windows.despachoOffset))} ${posYear(bt.d - windows.despachoOffset)} → `
+          + `Despacho ${monthName(bt.month)} ${posYear(bt.d)} → Llega ${monthName(mod12(bt.month + lead))} ${posYear(bt.d + lead)} · ${bt.n} cont`,
+      };
+    })
     .filter((x) => x.c >= 0 && x.l < 17);
 }
 
@@ -250,6 +283,7 @@ function destinoSection(markets, whList, despWh, windows, filter) {
     + '<span class="li"><span class="k-node k-d"></span><b>Despacho</b></span>'
     + '<span class="li"><span class="k-run"></span> tránsito</span>'
     + '<span class="li"><span class="k-node k-l"></span><b>Llegada</b> · disponible para vender</span>'
+    + '<span class="li"><span class="k-run k-run--rw"></span> origen <b>Rwanda</b> (carril aparte)</span>'
     + '<span class="li flujo-hint"><i data-lucide="mouse-pointer-2"></i> pasa el cursor por una cadena para aislarla</span>'
     + '</div>';
 
@@ -264,44 +298,60 @@ function destinoSection(markets, whList, despWh, windows, filter) {
     if (filter.market && mk.slug !== filter.market) return;
     const whs = whList.filter((w) => w.market === mk.slug && (!filter.wh || w.name === filter.wh));
     if (!whs.length) return;
+    // Buffer the market's blocks so an empty market prints no group header.
+    const before = html;
     html += `<div class="fd-grid"><div class="fgrp">${mk.name}</div></div>`;
+    const afterHeader = html;
 
     whs.forEach((w) => {
-      const chains = warehouseChains(w, despWh[w.name] || {}, windows);
-      const tot = chains.reduce((s, x) => s + x.n, 0);
-      const at = { c: {}, d: {}, l: {} };
-      chains.forEach((x) => { at.c[x.c] = x; at.d[x.d] = x; at.l[x.l] = x; });
+      const byCountry = despWh[w.name] || {};
+      // One lane block per origin, so Rwanda's departures never share a lane
+      // with Colombia's — and never collide in the same month.
+      const origins = originsOf(byCountry).filter((c) => !filter.country || c === filter.country);
+      origins.forEach((country) => {
+        const chains = warehouseChains(w, byCountry[country], windows, country);
+        if (!chains.length) return;
+        const tot = chains.reduce((s, x) => s + x.n, 0);
+        const key = `${w.name}__${country}`;
+        const at = { c: {}, d: {}, l: {} };
+        chains.forEach((x) => { at.c[x.c] = x; at.d[x.d] = x; at.l[x.l] = x; });
 
-      let cells = '';
-      [['c', 0], ['d', 1], ['l', 2]].forEach(([key, row]) => {
-        for (let p = 0; p < 17; p += 1) {
-          const x = at[key][p];
-          let mk2 = '';
-          if (x) {
-            const cls = key === 'l' ? 'fdm-l' : `${key === 'c' ? 'fdm-c' : 'fdm-d'} c${x.camp}`;
-            mk2 = `<span class="fdm ${cls}" data-cid="${x.id}">${x.n}<sup class="fseq">${x.seq}</sup></span>`;
+        let cells = '';
+        [['c', 0], ['d', 1], ['l', 2]].forEach(([lane, row]) => {
+          for (let p = 0; p < 17; p += 1) {
+            const x = at[lane][p];
+            let mkr = '';
+            if (x) {
+              const cls = lane === 'l' ? 'fdm-l' : `${lane === 'c' ? 'fdm-c' : 'fdm-d'} c${x.camp}`;
+              mkr = `<span class="fdm ${cls}${x.rw ? ' is-rw' : ''}" data-cid="${x.id}">${x.n}<sup class="fseq">${x.seq}</sup></span>`;
+            }
+            const noarr = row === 2 && isNoArr(p) ? ' noarr' : '';
+            cells += `<div class="fd-cell${row === 2 ? ' r3' : ''}${p === FLUJO_YSEP ? ' ysep' : ''}${noarr}">${mkr}</div>`;
           }
-          const noarr = row === 2 && isNoArr(p) ? ' noarr' : '';
-          cells += `<div class="fd-cell${row === 2 ? ' r3' : ''}${p === FLUJO_YSEP ? ' ysep' : ''}${noarr}">${mk2}</div>`;
-        }
+        });
+
+        const paths = chains.map((x) => {
+          const pts = [[x.c + 0.5, 0.5], [x.d + 0.5, 1.5], [x.l + 0.5, 2.5]].map(([a, b]) => `${a},${b}`).join(' ');
+          const stroke = x.camp === 1 ? 'var(--fc-blue-700)' : 'var(--fc-yellow-700)';
+          const rw = x.rw ? ' is-rw' : '';
+          return `<polyline class="${rw.trim()}" points="${pts}" stroke="${stroke}" vector-effect="non-scaling-stroke" data-cid="${x.id}"></polyline>`
+            + `<polyline class="hit" points="${pts}" stroke="transparent" vector-effect="non-scaling-stroke" data-cid="${x.id}"></polyline>`;
+        }).join('');
+
+        const originChip = origins.length > 1 || country !== 'Colombia'
+          ? `<span class="fd-origin${country === 'Rwanda' ? ' is-rw' : ''}">${country}</span>` : '';
+
+        html += `<div class="fd-grid fd-row">
+          <div class="fd-head"><span class="n">${w.name}</span>${originChip}<span class="s">${mk.name} · lead ${w.lead}m · ${tot} cont · ${chains.length} embarques</span><span class="fd-readout" data-readout="${key}"></span></div>
+          <div class="fd-labels"><div><span class="ic">◆</span>Corte</div><div><span class="ic">▸</span>Despacho</div><div><span class="ic">▮</span>Llegada</div></div>
+          <div class="fd-canvas" data-key="${key}" data-wh="${w.name}" data-country="${country}">
+            <svg class="fd-weave" viewBox="0 0 17 3" preserveAspectRatio="none">${paths}</svg>
+            <div class="fd-cells">${cells}</div>
+          </div>
+        </div>`;
       });
-
-      const paths = chains.map((x) => {
-        const pts = [[x.c + 0.5, 0.5], [x.d + 0.5, 1.5], [x.l + 0.5, 2.5]].map(([a, b]) => `${a},${b}`).join(' ');
-        const stroke = x.camp === 1 ? 'var(--fc-blue-700)' : 'var(--fc-yellow-700)';
-        return `<polyline points="${pts}" stroke="${stroke}" vector-effect="non-scaling-stroke" data-cid="${x.id}"></polyline>`
-          + `<polyline class="hit" points="${pts}" stroke="transparent" vector-effect="non-scaling-stroke" data-cid="${x.id}"></polyline>`;
-      }).join('');
-
-      html += `<div class="fd-grid fd-row">
-        <div class="fd-head"><span class="n">${w.name}</span><span class="s">${mk.name} · lead ${w.lead}m · ${tot} cont · ${chains.length} embarques</span><span class="fd-readout" data-readout="${w.name}"></span></div>
-        <div class="fd-labels"><div><span class="ic">◆</span>Corte</div><div><span class="ic">▸</span>Despacho</div><div><span class="ic">▮</span>Llegada</div></div>
-        <div class="fd-canvas" data-wh="${w.name}">
-          <svg class="fd-weave" viewBox="0 0 17 3" preserveAspectRatio="none">${paths}</svg>
-          <div class="fd-cells">${cells}</div>
-        </div>
-      </div>`;
     });
+    if (html === afterHeader) html = before; // no warehouse in this market shipped
   });
 
   inner.innerHTML = html;
@@ -309,10 +359,12 @@ function destinoSection(markets, whList, despWh, windows, filter) {
   // Hover a marker or its line → isolate that chain, dim the rest, and spell it
   // out in the warehouse header (a fixed readout never covers the grid).
   inner.querySelectorAll('.fd-canvas').forEach((canvas) => {
-    const readout = inner.querySelector(`[data-readout="${canvas.dataset.wh}"]`);
+    const readout = inner.querySelector(`[data-readout="${canvas.dataset.key}"]`);
     const wh = whList.find((x) => x.name === canvas.dataset.wh);
+    const { country } = canvas.dataset;
     const byId = {};
-    warehouseChains(wh, despWh[wh.name] || {}, windows).forEach((x) => { byId[x.id] = x.readout; });
+    warehouseChains(wh, despWh[wh.name]?.[country] || {}, windows, country)
+      .forEach((x) => { byId[x.id] = x.readout; });
     canvas.addEventListener('mouseover', (e) => {
       const t = e.target.closest('[data-cid]');
       if (!t) return;

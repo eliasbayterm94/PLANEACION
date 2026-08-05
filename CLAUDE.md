@@ -253,9 +253,22 @@ marker; since all chains share the same geometry they read as a cascade, and a
 shallower slope literally means a longer lead. Hovering a marker or its line
 isolates that chain (dims the rest) and spells it out in a **readout pinned to
 the warehouse header** — never a floating tooltip, which covered the grid.
-Despachos are coloured by campaign; filters are región destino / bodega / región
-origen. Note the header/band styles are shared by `.flujo-grid` (windows) and
-`.fd-grid` (destino) — keep both in the selector lists.
+Despachos are coloured by campaign. **Origin is a separate axis from campaign
+colour:** shipments are keyed by producing country, so a warehouse renders **one
+lane block per origin** (`NJ · Colombia`, `NJ · Rwanda`) — they never share a
+lane, so they can't collide in the same month. Rwanda blocks carry a chip, a
+dashed chain and an `R`-prefixed sequence (`NJ-R1`). The corte is
+`despachoOffset` months before the despacho for **every** origin, Rwanda
+included. Filters are región destino / bodega / región origen; picking an origin
+region narrows the destino to that region's **country** (the finest real
+granularity, since salidas are per country). Note the header/band styles are
+shared by `.flujo-grid` (windows) and `.fd-grid` (destino) — keep both in the
+selector lists.
+
+The Flujo tab also flips the whole pane to a **navy canvas** (`is-dark` on
+`.fc-app-main`, `fp-dark` on body) by redefining the design-system tokens rather
+than rewriting rules; `--fc-navy` inverts to a light value because it is both the
+heading colour and the filled "llegada" block.
 
 **Commercial campaign windows are a SEPARATE layer** from the product `CAMPAIGNS`
 (mitaca/principal). Here a "campaña" = when coffee is **available to sell at

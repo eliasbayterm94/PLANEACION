@@ -1363,3 +1363,17 @@ body.fp-dark .fc-app { background: var(--fc-navy-dark); }
 .fc-app-main.is-dark .fc-mobile-toggle { color: var(--fc-ink-500); }
 .fc-app-main.is-dark .fp-footer { border-top-color: var(--fc-ink-100); color: var(--fc-ink-500); }
 .fc-app-main.is-dark .fc-caption { color: var(--fc-ink-500); }
+
+/* Flujo destino — origin (país productor) differentiation.
+   Rwanda gets its own lane block, a chip in the header, a dashed chain and a
+   subtly tinted marker, so its departures never blend into Colombia's. */
+.fd-origin {
+  font-family: var(--fc-font-mono); font-size: 9.5px; letter-spacing: 0.04em;
+  padding: 1px 7px; border-radius: var(--fc-radius-1);
+  background: var(--fc-ink-100); color: var(--fc-ink-700); border: 1px solid var(--fc-ink-200);
+}
+.fd-origin.is-rw { background: var(--fc-blue-700); color: var(--fc-paper); border-color: var(--fc-blue-700); }
+.fd-weave polyline.is-rw { stroke-dasharray: 5 3.5; }
+.fdm.is-rw { border-style: dotted; }
+.fdm-l.is-rw { border-style: solid; box-shadow: inset 0 0 0 2px var(--fc-paper); }
+.k-run--rw { border-top-style: dashed; }
