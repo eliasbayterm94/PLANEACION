@@ -1,6 +1,6 @@
 import {
   MONTHS, monthName, mod12, FLUJO_AXIS, FLUJO_YSEP, flujoPos,
-  despachoMonths, campaignOfDespacho, listWarehouses, containersToKg,
+  despachoMonths, listWarehouses, containersToKg,
 } from '../model.js';
 
 /**
@@ -47,6 +47,18 @@ function yearBand(hasSigma) {
     + '<div class="yb" style="grid-column:2 / 7">Año operativo</div>'
     + '<div class="yb yb-2" style="grid-column:7 / 19">Año de venta</div>'
     + (hasSigma ? '<div class="yb-lab"></div>' : '');
+}
+
+// A shipment's despacho: Oct–Dic land in the prior/operative year (2026), the
+// rest in the sales year — so the shipping cycle reads Oct→Sep left to right.
+function despachoPos(m) {
+  const mm = mod12(m);
+  return mm >= 9 ? mm - 7 : 5 + mm;
+}
+// Commercial campaign of a despacho by calendar: Oct–Mar = C1, Abr–Sep = C2.
+function despCamp(m) {
+  const mm = mod12(m);
+  return (mm >= 9 || mm <= 2) ? 1 : 2;
 }
 
 // --- header + kpis ----------------------------------------------------------
@@ -222,33 +234,37 @@ function destinoSection(markets, whList, despWh, windows, filter) {
     const whs = whList.filter((w) => w.market === mk.slug && (!filter.wh || w.name === filter.wh));
     if (!whs.length) return;
     html += `<div class="fgrp">${mk.name}</div>`;
-    whs.forEach((w, wi) => {
+    whs.forEach((w) => {
       const months = despWh[w.name] || {};
-      // One "chain" (batch) per despacho month for this warehouse: its corte,
-      // despacho and llegada share a data-chain id so hover can link them.
+      // Each despacho month is a batch; number them per warehouse in cycle order
+      // (Oct→Sep) so every chain has a visible id like NJ-1, NJ-2…
+      const batches = Object.entries(months)
+        .map(([mm, n]) => ({ month: +mm, n, dPos: despachoPos(+mm) }))
+        .sort((a, b) => a.dPos - b.dPos);
       const cell = Array.from({ length: 17 }, () => []);
       let tot = 0;
-      Object.entries(months).forEach(([mm, n]) => {
-        const month = +mm;
-        const camp = campaignOfDespacho(windows, month) || 2;
+      batches.forEach((bt, bi) => {
+        const seq = bi + 1;
+        const camp = despCamp(bt.month);
         const lead = Math.round(w.lead);
-        const dPos = flujoPos(month, camp);
+        const dPos = bt.dPos;
         const cPos = dPos - windows.despachoOffset;
         const lPos = dPos + lead;
-        const id = `${mk.slug}-${wi}-${month}`;
-        const corteM = mod12(month - windows.despachoOffset);
-        const llegaM = mod12(month + lead);
-        const title = `Corte ${monthName(corteM)} → Despacho ${monthName(month)} → Llega ${w.name} ${monthName(llegaM)} · ${n} cont`;
-        if (cPos >= 0 && cPos < 17) cell[cPos].push({ t: 'conf', n, camp, id, title });
-        if (dPos >= 0 && dPos < 17) cell[dPos].push({ t: 'd', n, camp, id, title });
-        if (lPos >= 0 && lPos < 17) cell[lPos].push({ t: 'l', n, id, title });
-        tot += n;
+        const label = `${w.name}-${seq}`;
+        const corteM = mod12(bt.month - windows.despachoOffset);
+        const llegaM = mod12(bt.month + lead);
+        const title = `${label} · Corte ${monthName(corteM)} → Despacho ${monthName(bt.month)} → Llega ${w.name} ${monthName(llegaM)} · ${bt.n} cont`;
+        if (cPos >= 0 && cPos < 17) cell[cPos].push({ t: 'conf', n: bt.n, seq, camp, label, title });
+        if (dPos >= 0 && dPos < 17) cell[dPos].push({ t: 'd', n: bt.n, seq, camp, label, title });
+        if (lPos >= 0 && lPos < 17) cell[lPos].push({ t: 'l', n: bt.n, seq, label, title });
+        tot += bt.n;
       });
       const cells = FLUJO_AXIS.map((_, p) => {
         const inner = cell[p].map((m) => {
-          if (m.t === 'conf') return `<div class="fl fl-conf c${m.camp}" data-chain="${m.id}" title="${m.title}"><span class="sym">◆</span> ${m.n}</div>`;
-          if (m.t === 'd') return `<div class="fl fl-d c${m.camp}" data-chain="${m.id}" title="${m.title}"><span class="sym">▸</span> ${m.n}</div>`;
-          return `<div class="fl fl-l" data-chain="${m.id}" title="${m.title}"><span class="sym">▮</span> ${m.n}</div>`;
+          const seqb = `<sup class="fseq">${m.seq}</sup>`;
+          if (m.t === 'conf') return `<div class="fl fl-conf c${m.camp}" data-chain="${m.label}" title="${m.title}"><span class="sym">◆</span> ${m.n}${seqb}</div>`;
+          if (m.t === 'd') return `<div class="fl fl-d c${m.camp}" data-chain="${m.label}" title="${m.title}"><span class="sym">▸</span> ${m.n}${seqb}</div>`;
+          return `<div class="fl fl-l" data-chain="${m.label}" title="${m.title}"><span class="sym">▮</span> ${m.n}${seqb}</div>`;
         }).join('');
         return `<div class="fcell${isNoArr(p) ? ' noarr' : ''}${p === FLUJO_YSEP ? ' ysep' : ''}">${inner}</div>`;
       }).join('');

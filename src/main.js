@@ -4,6 +4,7 @@ import { defaultWarehouses, emptyWarehouseConfig } from './data/warehouses.js';
 import { defaultMarketGoals, defaultWarehouseGoals } from './data/goals.js';
 import { emptyCatalog, defaultCapacities } from './data/catalog.js';
 import { defaultCampaignWindows, normalizeWindows } from './data/campaignWindows.js';
+import { embarqueSeed } from './data/embarques.js';
 import {
   buildSchedules, CAMPAIGNS, YEAR, warehouseLeadLookup, emptyGoals,
   DEFAULT_COMPROMETIDO_PCT, setCampaignCortes,
@@ -104,6 +105,16 @@ function setShip(country, wh, month, containers) {
   if (containers > 0) months[month] = containers;
   else delete months[month];
   ship[wh] = months;
+  const value = { ship };
+  state.shipments[country] = value;
+  saveShipment(country, value, setStatus);
+  render();
+}
+
+/** Load the "Calendario de embarque" seed into a producing country's salidas. */
+function loadEmbarquesSeed(country) {
+  const ship = {};
+  Object.entries(embarqueSeed).forEach(([wh, months]) => { ship[wh] = { ...months }; });
   const value = { ship };
   state.shipments[country] = value;
   saveShipment(country, value, setStatus);
@@ -569,6 +580,7 @@ function renderView() {
       planCountry: state.planCountry,
       onCountry: (c) => { state.planCountry = c; render(); },
       onShip: (country, wh, month, containers) => setShip(country, wh, month, containers),
+      onLoadEmbarques: (country) => loadEmbarquesSeed(country),
     }));
   } else if (kind === 'flujo') {
     root.appendChild(renderFlujo({

@@ -16,13 +16,13 @@ import {
  */
 export function renderProgramacion({
   schedules, markets, warehouses, goals, shipments, leadLookup,
-  planCountry, onCountry, onShip,
+  planCountry, onCountry, onShip, onLoadEmbarques,
 }) {
   const el = document.createElement('div');
   const countries = listCountries(schedules);
   const country = planCountry && countries.includes(planCountry) ? planCountry : countries[0];
 
-  el.appendChild(header(shipments, leadLookup, countries, country, onCountry));
+  el.appendChild(header(shipments, leadLookup, countries, country, onCountry, onLoadEmbarques));
 
   const g = document.createElement('div');
   g.className = 'grid grid--consolidado grid--prog';
@@ -136,16 +136,32 @@ export function renderProgramacion({
   return el;
 }
 
-function header(shipments, leadLookup, countries, country, onCountry) {
+function header(shipments, leadLookup, countries, country, onCountry, onLoadEmbarques) {
   const wrap = document.createElement('div');
   wrap.className = 'view-head';
 
   const sal = totalSalidas(shipments).reduce((a, b) => a + b, 0);
   const lle = totalLlegadas(shipments, leadLookup).reduce((a, b) => a + b, 0);
 
+  const bar = document.createElement('div');
+  bar.className = 'prod-head-bar';
   const h = document.createElement('h2');
   h.textContent = 'Programación de salidas';
-  wrap.appendChild(h);
+  bar.appendChild(h);
+  if (onLoadEmbarques) {
+    const load = document.createElement('button');
+    load.type = 'button';
+    load.className = 'fc-btn fc-btn-ghost';
+    load.innerHTML = '<i data-lucide="download"></i> Cargar calendario de embarque';
+    load.title = `Carga el calendario de embarque en las salidas de ${country} (reemplaza las de ese país)`;
+    load.addEventListener('click', () => {
+      if (window.confirm(`¿Cargar el calendario de embarque en las salidas de ${country}? Reemplaza las salidas actuales de ${country}.`)) {
+        onLoadEmbarques(country);
+      }
+    });
+    bar.appendChild(load);
+  }
+  wrap.appendChild(bar);
 
   const sub = document.createElement('p');
   sub.className = 'view-sub';

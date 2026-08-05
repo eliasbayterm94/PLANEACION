@@ -1284,3 +1284,4 @@
 .flujo-view .fl-l.chain-hi { outline-color: var(--fc-yellow); }
 .flujo-hint { color: var(--fc-ink-300); font-size: 11px; }
 .flujo-hint i { width: 13px; height: 13px; stroke-width: 2; vertical-align: middle; }
+.flujo-view .fseq { font-size: 8px; font-weight: var(--fc-fw-bold); opacity: 0.6; margin-left: 1px; vertical-align: super; }
