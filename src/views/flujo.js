@@ -206,6 +206,7 @@ function destinoSection(markets, whList, despWh, windows, filter) {
     + '<span class="li"><span class="fl fl-d c1" style="padding:2px 8px">▸</span> Despacho C1</span>'
     + '<span class="li"><span class="fl fl-d c2" style="padding:2px 8px">▸</span> Despacho C2</span>'
     + '<span class="li"><span class="fl fl-l" style="padding:2px 8px">▮</span> Llegada · disponible</span>'
+    + '<span class="li flujo-hint"><i data-lucide="mouse-pointer-2"></i> pasa el cursor sobre un marcador para trazar su cadena</span>'
     + '</div>';
 
   const scroll = document.createElement('div');
@@ -221,30 +222,34 @@ function destinoSection(markets, whList, despWh, windows, filter) {
     const whs = whList.filter((w) => w.market === mk.slug && (!filter.wh || w.name === filter.wh));
     if (!whs.length) return;
     html += `<div class="fgrp">${mk.name}</div>`;
-    whs.forEach((w) => {
+    whs.forEach((w, wi) => {
       const months = despWh[w.name] || {};
-      const conf = new Array(17).fill(0);
-      const desp = new Array(17).fill(0);
-      const lleg = new Array(17).fill(0);
-      const confC = new Array(17).fill(0);
-      const despC = new Array(17).fill(0);
+      // One "chain" (batch) per despacho month for this warehouse: its corte,
+      // despacho and llegada share a data-chain id so hover can link them.
+      const cell = Array.from({ length: 17 }, () => []);
       let tot = 0;
       Object.entries(months).forEach(([mm, n]) => {
         const month = +mm;
         const camp = campaignOfDespacho(windows, month) || 2;
+        const lead = Math.round(w.lead);
         const dPos = flujoPos(month, camp);
         const cPos = dPos - windows.despachoOffset;
-        const lPos = dPos + Math.round(w.lead);
-        if (dPos >= 0 && dPos < 17) { desp[dPos] += n; despC[dPos] = camp; }
-        if (cPos >= 0 && cPos < 17) { conf[cPos] += n; confC[cPos] = camp; }
-        if (lPos >= 0 && lPos < 17) lleg[lPos] += n;
+        const lPos = dPos + lead;
+        const id = `${mk.slug}-${wi}-${month}`;
+        const corteM = mod12(month - windows.despachoOffset);
+        const llegaM = mod12(month + lead);
+        const title = `Corte ${monthName(corteM)} → Despacho ${monthName(month)} → Llega ${w.name} ${monthName(llegaM)} · ${n} cont`;
+        if (cPos >= 0 && cPos < 17) cell[cPos].push({ t: 'conf', n, camp, id, title });
+        if (dPos >= 0 && dPos < 17) cell[dPos].push({ t: 'd', n, camp, id, title });
+        if (lPos >= 0 && lPos < 17) cell[lPos].push({ t: 'l', n, id, title });
         tot += n;
       });
       const cells = FLUJO_AXIS.map((_, p) => {
-        let inner = '';
-        if (conf[p]) inner += `<div class="fl fl-conf c${confC[p]}"><span class="sym">◆</span> ${conf[p]}</div>`;
-        if (desp[p]) inner += `<div class="fl fl-d c${despC[p]}"><span class="sym">▸</span> ${desp[p]}</div>`;
-        if (lleg[p]) inner += `<div class="fl fl-l"><span class="sym">▮</span> ${lleg[p]}</div>`;
+        const inner = cell[p].map((m) => {
+          if (m.t === 'conf') return `<div class="fl fl-conf c${m.camp}" data-chain="${m.id}" title="${m.title}"><span class="sym">◆</span> ${m.n}</div>`;
+          if (m.t === 'd') return `<div class="fl fl-d c${m.camp}" data-chain="${m.id}" title="${m.title}"><span class="sym">▸</span> ${m.n}</div>`;
+          return `<div class="fl fl-l" data-chain="${m.id}" title="${m.title}"><span class="sym">▮</span> ${m.n}</div>`;
+        }).join('');
         return `<div class="fcell${isNoArr(p) ? ' noarr' : ''}${p === FLUJO_YSEP ? ' ysep' : ''}">${inner}</div>`;
       }).join('');
       html += `<div class="flabel"><span class="fl-name">${w.name}</span><span class="fl-sub">lead ${w.lead}m</span></div>${cells}<div class="ftot">${tot}</div>`;
@@ -252,6 +257,16 @@ function destinoSection(markets, whList, despWh, windows, filter) {
   });
 
   grid.innerHTML = html;
+  // Hover any marker → highlight its whole corte→despacho→llegada chain.
+  grid.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('[data-chain]');
+    if (!el) return;
+    grid.querySelectorAll(`[data-chain="${el.dataset.chain}"]`).forEach((m) => m.classList.add('chain-hi'));
+  });
+  grid.addEventListener('mouseout', (e) => {
+    if (!e.target.closest('[data-chain]')) return;
+    grid.querySelectorAll('.chain-hi').forEach((m) => m.classList.remove('chain-hi'));
+  });
   scroll.appendChild(grid);
   sec.appendChild(scroll);
   return sec;

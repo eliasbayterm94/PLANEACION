@@ -1277,3 +1277,10 @@
 .win-derived-val { font-family: var(--fc-font-mono); color: var(--fc-ink-700); }
 .win-offset-row { display: grid; grid-template-columns: 1fr 96px; gap: 12px; align-items: center; padding: 5px 0; font-size: 13px; }
 @media (max-width: 767px) { .win-derived-row { grid-template-columns: 1fr; gap: 2px; } }
+
+/* Flujo — hover-highlight a container's full corte→despacho→llegada chain */
+.flujo-view .fl[data-chain] { cursor: default; transition: outline-color 80ms ease; }
+.flujo-view .chain-hi { outline: 2px solid var(--fc-navy); outline-offset: 1px; position: relative; z-index: 3; }
+.flujo-view .fl-l.chain-hi { outline-color: var(--fc-yellow); }
+.flujo-hint { color: var(--fc-ink-300); font-size: 11px; }
+.flujo-hint i { width: 13px; height: 13px; stroke-width: 2; vertical-align: middle; }
