@@ -1,7 +1,10 @@
 import {
   MONTHS, monthName, mod12, FLUJO_AXIS, FLUJO_YSEP, flujoPos,
-  despachoMonths, listWarehouses, containersToKg,
+  despachoMonths, listWarehouses, containersToKg, YEAR,
 } from '../model.js';
+
+/** Two-digit year for an axis position: the operative block is the prior year. */
+const posYear = (p) => String(p < FLUJO_YSEP ? YEAR - 1 : YEAR).slice(2);
 
 /**
  * Flujo — read-only roadmap for operations & sales, fed by the salidas inputs.
@@ -44,8 +47,8 @@ function headCells() {
 
 function yearBand(hasSigma) {
   return '<div class="yb-lab"></div>'
-    + '<div class="yb" style="grid-column:2 / 7">Año operativo</div>'
-    + '<div class="yb yb-2" style="grid-column:7 / 19">Año de venta</div>'
+    + `<div class="yb" style="grid-column:2 / 7">${YEAR - 1} · operativo</div>`
+    + `<div class="yb yb-2" style="grid-column:7 / 19">${YEAR} · año de venta</div>`
     + (hasSigma ? '<div class="yb-lab"></div>' : '');
 }
 
@@ -209,81 +212,124 @@ function despachosByWarehouse(shipments) {
   return out;
 }
 
+/** Container batches for a warehouse, numbered in cycle order (Oct→Sep). */
+function warehouseChains(w, months, windows) {
+  const lead = Math.round(w.lead);
+  return Object.entries(months)
+    .map(([mm, n]) => ({ month: +mm, n, d: despachoPos(+mm) }))
+    .sort((a, b) => a.d - b.d)
+    .map((bt, i) => ({
+      id: `${w.name}-${i + 1}`,
+      seq: i + 1,
+      n: bt.n,
+      camp: despCamp(bt.month),
+      c: bt.d - windows.despachoOffset,
+      d: bt.d,
+      l: bt.d + lead,
+      readout: `${w.name}-${i + 1} · Corte ${monthName(mod12(bt.month - windows.despachoOffset))} ${posYear(bt.d - windows.despachoOffset)} → `
+        + `Despacho ${monthName(bt.month)} ${posYear(bt.d)} → Llega ${monthName(mod12(bt.month + lead))} ${posYear(bt.d + lead)} · ${bt.n} cont`,
+    }))
+    .filter((x) => x.c >= 0 && x.l < 17);
+}
+
+/**
+ * Destino — "carriles con flujo": three fixed lanes per warehouse (Corte ·
+ * Despacho · Llegada) so the stage is never ambiguous, with each container's
+ * chain drawn as diagonals across the lanes. The diagonals run through the
+ * gutter between lanes, so they stay visible even when every month carries a
+ * marker; all chains share the same geometry, so they read as a cascade, and
+ * a shallower slope literally means a longer lead.
+ */
 function destinoSection(markets, whList, despWh, windows, filter) {
   const sec = document.createElement('section');
   sec.className = 'flujo-sec';
-  sec.innerHTML = '<div class="sec-head"><h3 class="section-title">Destino — confirmación, despacho y llegada por bodega</h3></div>'
+  sec.innerHTML = '<div class="sec-head"><h3 class="section-title">Destino — corte, despacho y llegada por bodega</h3></div>'
     + '<div class="flujo-legend">'
-    + '<span class="li"><span class="fl fl-conf c1" style="padding:2px 8px">◆</span> Corte confirmación</span>'
-    + '<span class="li"><span class="fl fl-d c1" style="padding:2px 8px">▸</span> Despacho C1</span>'
-    + '<span class="li"><span class="fl fl-d c2" style="padding:2px 8px">▸</span> Despacho C2</span>'
-    + '<span class="li"><span class="fl fl-l" style="padding:2px 8px">▮</span> Llegada · disponible</span>'
-    + '<span class="li flujo-hint"><i data-lucide="mouse-pointer-2"></i> pasa el cursor sobre un marcador para trazar su cadena</span>'
+    + '<span class="li"><span class="k-node k-c"></span><b>Corte</b> confirma e inicia producción</span>'
+    + '<span class="li"><span class="k-run"></span> producción + trilla</span>'
+    + '<span class="li"><span class="k-node k-d"></span><b>Despacho</b></span>'
+    + '<span class="li"><span class="k-run"></span> tránsito</span>'
+    + '<span class="li"><span class="k-node k-l"></span><b>Llegada</b> · disponible para vender</span>'
+    + '<span class="li flujo-hint"><i data-lucide="mouse-pointer-2"></i> pasa el cursor por una cadena para aislarla</span>'
     + '</div>';
 
   const scroll = document.createElement('div');
   scroll.className = 'flujo-scroll';
-  const grid = document.createElement('div');
-  grid.className = 'flujo-grid flujo-grid--destino';
+  const inner = document.createElement('div');
+  inner.className = 'fd-inner';
 
-  let html = yearBand(true) + '<div class="mhead corner">Mercado · bodega</div>' + headCells()
-    + '<div class="mhead" style="text-align:right;padding-right:10px">Σ</div>';
+  let html = `<div class="fd-grid">${yearBand(false)}<div class="mhead corner">Bodega · etapa</div>${headCells()}</div>`;
 
   markets.forEach((mk) => {
     if (filter.market && mk.slug !== filter.market) return;
     const whs = whList.filter((w) => w.market === mk.slug && (!filter.wh || w.name === filter.wh));
     if (!whs.length) return;
-    html += `<div class="fgrp">${mk.name}</div>`;
+    html += `<div class="fd-grid"><div class="fgrp">${mk.name}</div></div>`;
+
     whs.forEach((w) => {
-      const months = despWh[w.name] || {};
-      // Each despacho month is a batch; number them per warehouse in cycle order
-      // (Oct→Sep) so every chain has a visible id like NJ-1, NJ-2…
-      const batches = Object.entries(months)
-        .map(([mm, n]) => ({ month: +mm, n, dPos: despachoPos(+mm) }))
-        .sort((a, b) => a.dPos - b.dPos);
-      const cell = Array.from({ length: 17 }, () => []);
-      let tot = 0;
-      batches.forEach((bt, bi) => {
-        const seq = bi + 1;
-        const camp = despCamp(bt.month);
-        const lead = Math.round(w.lead);
-        const dPos = bt.dPos;
-        const cPos = dPos - windows.despachoOffset;
-        const lPos = dPos + lead;
-        const label = `${w.name}-${seq}`;
-        const corteM = mod12(bt.month - windows.despachoOffset);
-        const llegaM = mod12(bt.month + lead);
-        const title = `${label} · Corte ${monthName(corteM)} → Despacho ${monthName(bt.month)} → Llega ${w.name} ${monthName(llegaM)} · ${bt.n} cont`;
-        if (cPos >= 0 && cPos < 17) cell[cPos].push({ t: 'conf', n: bt.n, seq, camp, label, title });
-        if (dPos >= 0 && dPos < 17) cell[dPos].push({ t: 'd', n: bt.n, seq, camp, label, title });
-        if (lPos >= 0 && lPos < 17) cell[lPos].push({ t: 'l', n: bt.n, seq, label, title });
-        tot += bt.n;
+      const chains = warehouseChains(w, despWh[w.name] || {}, windows);
+      const tot = chains.reduce((s, x) => s + x.n, 0);
+      const at = { c: {}, d: {}, l: {} };
+      chains.forEach((x) => { at.c[x.c] = x; at.d[x.d] = x; at.l[x.l] = x; });
+
+      let cells = '';
+      [['c', 0], ['d', 1], ['l', 2]].forEach(([key, row]) => {
+        for (let p = 0; p < 17; p += 1) {
+          const x = at[key][p];
+          let mk2 = '';
+          if (x) {
+            const cls = key === 'l' ? 'fdm-l' : `${key === 'c' ? 'fdm-c' : 'fdm-d'} c${x.camp}`;
+            mk2 = `<span class="fdm ${cls}" data-cid="${x.id}">${x.n}<sup class="fseq">${x.seq}</sup></span>`;
+          }
+          const noarr = row === 2 && isNoArr(p) ? ' noarr' : '';
+          cells += `<div class="fd-cell${row === 2 ? ' r3' : ''}${p === FLUJO_YSEP ? ' ysep' : ''}${noarr}">${mk2}</div>`;
+        }
       });
-      const cells = FLUJO_AXIS.map((_, p) => {
-        const inner = cell[p].map((m) => {
-          const seqb = `<sup class="fseq">${m.seq}</sup>`;
-          if (m.t === 'conf') return `<div class="fl fl-conf c${m.camp}" data-chain="${m.label}" title="${m.title}"><span class="sym">◆</span> ${m.n}${seqb}</div>`;
-          if (m.t === 'd') return `<div class="fl fl-d c${m.camp}" data-chain="${m.label}" title="${m.title}"><span class="sym">▸</span> ${m.n}${seqb}</div>`;
-          return `<div class="fl fl-l" data-chain="${m.label}" title="${m.title}"><span class="sym">▮</span> ${m.n}${seqb}</div>`;
-        }).join('');
-        return `<div class="fcell${isNoArr(p) ? ' noarr' : ''}${p === FLUJO_YSEP ? ' ysep' : ''}">${inner}</div>`;
+
+      const paths = chains.map((x) => {
+        const pts = [[x.c + 0.5, 0.5], [x.d + 0.5, 1.5], [x.l + 0.5, 2.5]].map(([a, b]) => `${a},${b}`).join(' ');
+        const stroke = x.camp === 1 ? 'var(--fc-blue-700)' : 'var(--fc-yellow-700)';
+        return `<polyline points="${pts}" stroke="${stroke}" vector-effect="non-scaling-stroke" data-cid="${x.id}"></polyline>`
+          + `<polyline class="hit" points="${pts}" stroke="transparent" vector-effect="non-scaling-stroke" data-cid="${x.id}"></polyline>`;
       }).join('');
-      html += `<div class="flabel"><span class="fl-name">${w.name}</span><span class="fl-sub">lead ${w.lead}m</span></div>${cells}<div class="ftot">${tot}</div>`;
+
+      html += `<div class="fd-grid fd-row">
+        <div class="fd-head"><span class="n">${w.name}</span><span class="s">${mk.name} · lead ${w.lead}m · ${tot} cont · ${chains.length} embarques</span><span class="fd-readout" data-readout="${w.name}"></span></div>
+        <div class="fd-labels"><div><span class="ic">◆</span>Corte</div><div><span class="ic">▸</span>Despacho</div><div><span class="ic">▮</span>Llegada</div></div>
+        <div class="fd-canvas" data-wh="${w.name}">
+          <svg class="fd-weave" viewBox="0 0 17 3" preserveAspectRatio="none">${paths}</svg>
+          <div class="fd-cells">${cells}</div>
+        </div>
+      </div>`;
     });
   });
 
-  grid.innerHTML = html;
-  // Hover any marker → highlight its whole corte→despacho→llegada chain.
-  grid.addEventListener('mouseover', (e) => {
-    const el = e.target.closest('[data-chain]');
-    if (!el) return;
-    grid.querySelectorAll(`[data-chain="${el.dataset.chain}"]`).forEach((m) => m.classList.add('chain-hi'));
+  inner.innerHTML = html;
+
+  // Hover a marker or its line → isolate that chain, dim the rest, and spell it
+  // out in the warehouse header (a fixed readout never covers the grid).
+  inner.querySelectorAll('.fd-canvas').forEach((canvas) => {
+    const readout = inner.querySelector(`[data-readout="${canvas.dataset.wh}"]`);
+    const wh = whList.find((x) => x.name === canvas.dataset.wh);
+    const byId = {};
+    warehouseChains(wh, despWh[wh.name] || {}, windows).forEach((x) => { byId[x.id] = x.readout; });
+    canvas.addEventListener('mouseover', (e) => {
+      const t = e.target.closest('[data-cid]');
+      if (!t) return;
+      const { cid } = t.dataset;
+      canvas.classList.add('has-focus');
+      canvas.querySelectorAll('.on').forEach((n) => n.classList.remove('on'));
+      canvas.querySelectorAll(`[data-cid="${cid}"]`).forEach((n) => n.classList.add('on'));
+      if (readout) { readout.textContent = byId[cid] || ''; readout.classList.add('show'); }
+    });
+    canvas.addEventListener('mouseleave', () => {
+      canvas.classList.remove('has-focus');
+      canvas.querySelectorAll('.on').forEach((n) => n.classList.remove('on'));
+      if (readout) readout.classList.remove('show');
+    });
   });
-  grid.addEventListener('mouseout', (e) => {
-    if (!e.target.closest('[data-chain]')) return;
-    grid.querySelectorAll('.chain-hi').forEach((m) => m.classList.remove('chain-hi'));
-  });
-  scroll.appendChild(grid);
+
+  scroll.appendChild(inner);
   sec.appendChild(scroll);
   return sec;
 }

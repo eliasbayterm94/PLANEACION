@@ -240,9 +240,22 @@ The **Flujo** tab (`views/flujo.js`) is a **read-only** roadmap for ops & sales,
 fed by the salidas inputs. A **17-month axis** (Ago–Dic of the operative year +
 Ene–Dic of the sales year, `FLUJO_AXIS`/`flujoPos` in `model.js`) shows two
 lenses: the **campaign windows** (cosechas reference + muestra→corte→producción→
-trilla→despacho→disponible per campaign) and the **destino por bodega**
-(corte de confirmación → despacho → llegada, derived per warehouse). Despachos
-are coloured by campaign; filters are región destino / bodega / región origen.
+trilla→despacho→disponible per campaign) and the **destino por bodega**.
+
+**Destino = "carriles con flujo".** Each warehouse gets **three fixed lanes**
+(Corte · Despacho · Llegada) so a marker's stage is never ambiguous and nothing
+stacks — at most one marker per month and lane. Each container batch (one per
+despacho month, numbered per warehouse in cycle order: `NJ-1`, `NJ-2`…) is drawn
+as **two diagonals** across the lanes via an SVG overlay (`.fd-weave`, viewBox in
+column units + `vector-effect="non-scaling-stroke"`). The diagonals run through
+the gutter *between* lanes, so they stay visible even when every month carries a
+marker; since all chains share the same geometry they read as a cascade, and a
+shallower slope literally means a longer lead. Hovering a marker or its line
+isolates that chain (dims the rest) and spells it out in a **readout pinned to
+the warehouse header** — never a floating tooltip, which covered the grid.
+Despachos are coloured by campaign; filters are región destino / bodega / región
+origen. Note the header/band styles are shared by `.flujo-grid` (windows) and
+`.fd-grid` (destino) — keep both in the selector lists.
 
 **Commercial campaign windows are a SEPARATE layer** from the product `CAMPAIGNS`
 (mitaca/principal). Here a "campaña" = when coffee is **available to sell at
